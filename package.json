@@ -1,7 +1,7 @@
 {
   "name": "zarrita-viewer-test",
   "version": "1.0.0",
-  "description": "Web-viewer test for zarr files",
+  "description": "Web-viewer test for zarr files, using zarrita.js and vizarr",
   "license": "ISC",
   "author": "Teinc3",
   "type": "module",
@@ -10,6 +10,16 @@
     "test": "node loading_test/index.js"
   },
   "dependencies": {
+    "@hms-dbmi/vizarr": "^0.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
     "zarrita": "^0.5.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
   }
 }
