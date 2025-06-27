@@ -7,15 +7,21 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "node loading_test/index.js"
+    "test": "node loading_test/index.js",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
     "@hms-dbmi/vizarr": "^0.3.0",
+    "next": "^15.3.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "zarrita": "^0.5.1"
   },
   "devDependencies": {
+    "@types/node": "24.0.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
