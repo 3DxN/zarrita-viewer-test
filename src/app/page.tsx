@@ -1,8 +1,8 @@
 'use client'
 
 import CrossViewer from '../components/crossviewer'
+import MacroViewer from '../components/macroviewer'
 // import FeatureViewer from '../components/featureviewer' 
-// import CrossViewer from '../components/crossviewer'
 
 export default function Home() {
   return (  
@@ -12,7 +12,7 @@ export default function Home() {
 
         <div style={{ flex: '1' }}>
           <h2>Macro Viewer</h2>
-          <p>Coming Soon...</p>
+          <MacroViewer height={500} width={500}/>
         </div>
 
         <div style={{ flex: '1' }}>
