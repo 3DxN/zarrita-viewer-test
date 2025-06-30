@@ -1,70 +1,100 @@
 import React, { useMemo, useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 
 const VolumeRenderer = ({ dataInfo }: { dataInfo: any }) => {
-  const mesh = useRef<THREE.Mesh>(null);
+  const groupRef = useRef<THREE.Group>(null);
 
-  console.log('VolumeRenderer received dataInfo:', dataInfo ? 'YES' : 'NO');
-
-  // Create multiple 2D slice textures from the 3D data
-  const sliceTextures = useMemo(() => {
+  // Create ALL slice textures from the 3D data
+  const allSlices = useMemo(() => {
     if (!dataInfo || !dataInfo.normalizedData) {
-      console.log('VolumeRenderer: No dataInfo or normalizedData');
       return null;
     }
     
     const { x, y, z, normalizedData } = dataInfo;
-    
-    console.log(`VolumeRenderer: Creating slice textures from: ${x}x${y}x${z}, ${normalizedData.length} values`);
-    
+        
     try {
-      // Take middle slice (z/2) for now
-      const middleZ = Math.floor(z / 2);
+      const slices = [];
       const sliceSize = x * y;
-      const sliceStart = middleZ * sliceSize;
-      const sliceData = normalizedData.slice(sliceStart, sliceStart + sliceSize);
       
-      console.log(`VolumeRenderer: Using middle slice ${middleZ}, data length: ${sliceData.length}`);
-      console.log('VolumeRenderer: Sample values:', Array.from(sliceData.slice(0, 5)));
+      // Calculate proper voxel spacing for accurate 3D structure
+      const voxelSpacing = 2.0 / Math.max(x, y, z); // Normalize to fit in 2x2x2 space
+      const totalZDepth = (z - 1) * voxelSpacing;
       
-      const tex = new THREE.DataTexture(sliceData, x, y);
-      tex.format = THREE.RedFormat;
-      tex.type = THREE.FloatType;
-      tex.minFilter = THREE.NearestFilter;
-      tex.magFilter = THREE.NearestFilter;
-      tex.needsUpdate = true;
+      console.log(`VolumeRenderer: Voxel spacing: ${voxelSpacing}, Total Z depth: ${totalZDepth}`);
       
-      console.log('VolumeRenderer: 2D slice texture created successfully');
-      return tex;
+      // Create texture for EVERY Z slice
+      for (let zi = 0; zi < z; zi++) {
+        const sliceStart = zi * sliceSize;
+        const sliceData = normalizedData.slice(sliceStart, sliceStart + sliceSize);
+        
+        console.log(`VolumeRenderer: Creating slice ${zi}/${z}, data length: ${sliceData.length}`);
+        
+        const tex = new THREE.DataTexture(sliceData, x, y);
+        tex.format = THREE.RedFormat;
+        tex.type = THREE.FloatType;
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+        
+        // Position slices with exact voxel spacing
+        const zPosition = (zi * voxelSpacing) - (totalZDepth / 2);
+        
+        slices.push({
+          texture: tex,
+          position: zPosition,
+          slice: zi,
+          opacity: 0.3
+        });
+      }
+      
+      console.log(`VolumeRenderer: Created ${slices.length} slice textures successfully`);
+      console.log(`VolumeRenderer: Z positions range from ${slices[0].position} to ${slices[slices.length-1].position}`);
+      return slices;
+      
     } catch (error) {
-      console.error('VolumeRenderer: Failed to create slice texture:', error);
+      console.error('VolumeRenderer: Failed to create slice textures:', error);
       return null;
     }
   }, [dataInfo]);
 
-  if (!sliceTextures) {
+  // Optional: slow rotation to see the volume from different angles
+  useFrame((state, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.1;
+    }
+  });
+
+  if (!allSlices) {
     console.log('VolumeRenderer: Rendering fallback red wireframe');
     return (
-      <mesh ref={mesh}>
+      <mesh>
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial color="red" wireframe />
       </mesh>
     );
   }
 
-  console.log('VolumeRenderer: Rendering textured cube with 2D slice');
-  // Use the 2D slice texture on the cube faces
+  console.log(`VolumeRenderer: Rendering ${allSlices.length} slice planes with proper voxel spacing`);
+  
+  // Render ALL slices as separate transparent planes with proper spacing
   return (
-    <mesh ref={mesh}>
-      <boxGeometry args={[2, 2, 2]} />
-      <meshBasicMaterial 
-        map={sliceTextures}
-        side={THREE.DoubleSide}
-        transparent={true} 
-        opacity={0.8}
-      />
-    </mesh>
+    <group ref={groupRef}>
+      {allSlices.map((slice, index) => (
+        <mesh key={index} position={[0, 0, slice.position]}>
+          <planeGeometry args={[2, 2]} />
+          <meshBasicMaterial 
+            map={slice.texture}
+            transparent={true}
+            opacity={slice.opacity}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            blending={THREE.AdditiveBlending}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 };
 
