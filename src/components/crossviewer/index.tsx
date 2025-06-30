@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import ZarrLoader from './loader'
+import ArrayLoader from '../common/ArrayLoader'
 import ZarrViewer from './viewer'
 import NavigationControls from './navigator'
-import { NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
+
+import type { CrossViewerProps, NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
+
 
 export default function CrossViewer() {
   const [loading, setLoading] = useState(false)
@@ -105,8 +107,8 @@ export default function CrossViewer() {
   }, [])
 
   return (
-    <div style={{ border: '1px solid #ccc', padding: '15px', borderRadius: '8px' }}>
-      <ZarrLoader 
+    <div style={{ border: '1px solid #dee2e6', padding: '15px', borderRadius: '8px', backgroundColor: 'white' }}>
+      <ArrayLoader
         onArrayLoaded={handleArrayLoaded}
         onError={handleError}
         onLoadingChange={setLoading}

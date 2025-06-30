@@ -59,13 +59,6 @@ const VolumeRenderer = ({ dataInfo }: { dataInfo: any }) => {
     }
   }, [dataInfo]);
 
-  // Optional: slow rotation to see the volume from different angles
-  useFrame((state, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.1;
-    }
-  });
-
   if (!allSlices) {
     console.log('VolumeRenderer: Rendering fallback red wireframe');
     return (

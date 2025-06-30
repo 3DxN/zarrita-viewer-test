@@ -1,97 +1,156 @@
 'use client'
 
 import { useState } from 'react'
-import type { ZarrLoaderProps } from '../../types/crossviewer'
+import { useZarrStore } from '../../contexts/ZarrStoreContext'
+
+interface ZarrLoaderProps {
+  onArrayLoaded: (arr: any, arrayInfo: any) => void
+  onError: (error: string) => void
+  onLoadingChange: (loading: boolean) => void
+}
 
 export default function ZarrLoader({ onArrayLoaded, onError, onLoadingChange }: ZarrLoaderProps) {
-  const [zarrUrl, setZarrUrl] = useState('http://localhost:5500/test_prostate_s1+crop_v3_fix.ome.zarr')
-  const [directory, setDirectory] = useState('0/0')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { source, setSource, store, root, availableResolutions, availableChannels, loadStore, isLoading, error } = useZarrStore()
+  const [selectedResolution, setSelectedResolution] = useState('0')
+  const [selectedChannel, setSelectedChannel] = useState(0)
 
-  const loadZarrData = async () => {
-    setLoading(true)
-    setError(null)
+  const handleLoadStore = async () => {
+    if (!source) return
+    await loadStore(source)
+  }
+
+  const loadArrayFromStore = async () => {
+    if (!store || !root) {
+      onError('No store loaded. Please load a Zarr store first.')
+      return
+    }
+
     onLoadingChange(true)
     
-    try {
+    try {      
       const zarrita = await import('zarrita')
-      
-      // Load the store and try to open the array directly
-      const store = new zarrita.FetchStore(zarrUrl)
-      const root = zarrita.root(store)
-      const arr = await zarrita.open(root.resolve(directory), { kind: 'array' })
+      const arr = await zarrita.open(root.resolve(selectedResolution), { kind: 'array' })
       
       const arrayInfo = {
         shape: arr.shape,
         dtype: arr.dtype,
-        chunks: arr.chunks
+        chunks: arr.chunks,
+        resolution: selectedResolution,
+        channel: selectedChannel
       }
       
       onArrayLoaded(arr, arrayInfo)
       
     } catch (err) {
-      // If it's not an array, try as group and show simple error
-      try {
-        const zarrita = await import('zarrita')
-        const store = new zarrita.FetchStore(zarrUrl)
-        const root = zarrita.root(store)
-        await zarrita.open(root.resolve(directory), { kind: 'group' })
-        const errorMsg = `Path "${directory}" is a group. Navigate deeper into the directory structure.`
-        setError(errorMsg)
-        onError(errorMsg)
-      } catch (e) {
-        const errorMsg = `Error loading path "${directory}": ${err instanceof Error ? err.message : 'Unknown error'}`
-        setError(errorMsg)
-        onError(errorMsg)
-      }
+      const errorMsg = `Error loading array at resolution "${selectedResolution}": ${err instanceof Error ? err.message : 'Unknown error'}`
+      onError(errorMsg)
     } finally {
-      setLoading(false)
       onLoadingChange(false)
     }
   }
 
   return (
     <div style={{ marginBottom: '15px' }}>
-      <div style={{ marginBottom: '10px' }}>
-        <label style={{ display: 'block', marginBottom: '5px' }}>Zarr URL:</label>
-        <input 
-          type="text" 
-          value={zarrUrl} 
-          onChange={(e) => setZarrUrl(e.target.value)}
-          style={{ width: '100%', padding: '5px', marginBottom: '5px' }}
-          placeholder="Enter Zarr URL"
-        />
-      </div>
-
-      <div style={{ display: 'flex', gap: '30px', alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Path (Resolution):</label>
+      {/* URL Input and Store Loading */}
+      <div style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+        <h4 style={{ margin: '0 0 10px 0' }}>Zarr Store</h4>
+        <div style={{ marginBottom: '10px' }}>
+          <label style={{ display: 'block', marginBottom: '5px' }}>Zarr URL:</label>
           <input 
             type="text" 
-            value={directory} 
-            onChange={(e) => setDirectory(e.target.value)}
-            style={{ width: '100%', padding: '5px' }}
-            placeholder="0/0"
+            value={source} 
+            onChange={(e) => setSource(e.target.value)}
+            style={{ width: '100%', padding: '5px', marginBottom: '5px' }}
+            placeholder="Enter Zarr URL"
           />
         </div>
-        
         <button 
-          onClick={loadZarrData} 
-          disabled={loading}
+          onClick={handleLoadStore} 
+          disabled={isLoading || !source}
           style={{ 
-            padding: '10px 20px', 
-            backgroundColor: '#007bff', 
+            padding: '8px 16px', 
+            backgroundColor: '#28a745', 
             color: 'white', 
             border: 'none', 
             borderRadius: '4px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            height: 'fit-content'
+            cursor: isLoading || !source ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Loading...' : 'Load Zarr'}
+          {isLoading ? 'Loading Store...' : 'Load Store'}
         </button>
       </div>
+
+      {/* Resolution and Channel Selection */}
+      {store && (
+        <div style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '4px' }}>
+          <h4 style={{ margin: '0 0 10px 0' }}>Array Selection</h4>
+          
+          {/* Resolution Buttons */}
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', marginBottom: '5px' }}>Resolution:</label>
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+              {availableResolutions.map((resolution) => (
+                <button
+                  key={resolution}
+                  onClick={() => setSelectedResolution(resolution)}
+                  style={{
+                    padding: '5px 10px',
+                    backgroundColor: selectedResolution === resolution ? '#007bff' : '#f8f9fa',
+                    color: selectedResolution === resolution ? 'white' : 'black',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px'
+                  }}
+                >
+                  {resolution}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Channel Buttons */}
+          {availableChannels.length > 0 && (
+            <div style={{ marginBottom: '10px' }}>
+              <label style={{ display: 'block', marginBottom: '5px' }}>Channel:</label>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                {availableChannels.map((channel, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedChannel(index)}
+                    style={{
+                      padding: '5px 10px',
+                      backgroundColor: selectedChannel === index ? '#17a2b8' : '#f8f9fa',
+                      color: selectedChannel === index ? 'white' : 'black',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '12px'
+                    }}
+                  >
+                    {channel}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          <button 
+            onClick={loadArrayFromStore} 
+            disabled={!selectedResolution}
+            style={{ 
+              padding: '8px 16px', 
+              backgroundColor: '#007bff', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '4px',
+              cursor: !selectedResolution ? 'not-allowed' : 'pointer',
+            }}
+          >
+            Load Array
+          </button>
+        </div>
+      )}
       
       {error && (
         <div style={{ 
