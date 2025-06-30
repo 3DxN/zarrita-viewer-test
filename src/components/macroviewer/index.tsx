@@ -1,61 +1,12 @@
-import React, { FC, useState, useEffect, useRef, useMemo } from 'react';
+import React, { FC, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import * as THREE from 'three';
 import * as zarrita from 'zarrita';
 
 import VolumeViewer from './volumeviewer'; // Assuming this is in the same directory
 import OMEAttrs from '../../types/ome';
+import type { MacroViewerProps } from '../../types/macroviewer';
 
-// --- Simple Texture Test (fallback to 2D texture first) ---
-const SimpleTextureRenderer = ({ dataInfo }: { dataInfo: any }) => {
-  const mesh = useRef<THREE.Mesh>(null);
-
-  // Create a simple 2D texture from the first slice of data
-  const texture2D = useMemo(() => {
-    if (!dataInfo || !dataInfo.normalizedData) return null;
-    
-    // Take the first Z slice (z=0)
-    const { x, y, z, normalizedData } = dataInfo;
-    const sliceSize = x * y;
-    const sliceData = normalizedData.slice(0, sliceSize);
-    
-    console.log(`Creating 2D texture from first slice: ${x}x${y}, ${sliceData.length} values`);
-    console.log('Sample values:', Array.from(sliceData.slice(0, 10)));
-    
-    const tex = new THREE.DataTexture(sliceData, x, y);
-    tex.format = THREE.RedFormat;
-    tex.type = THREE.FloatType;
-    tex.minFilter = THREE.NearestFilter;
-    tex.magFilter = THREE.NearestFilter;
-    tex.needsUpdate = true;
-    
-    return tex;
-  }, [dataInfo]);
-
-  if (!texture2D) {
-    return (
-      <mesh ref={mesh}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="blue" />
-      </mesh>
-    );
-  }
-
-  return (
-    <mesh ref={mesh}>
-      <planeGeometry args={[2, 2]} />
-      <meshBasicMaterial map={texture2D} />
-    </mesh>
-  );
-};
-
-// --- Main MacroViewer Component ---
-interface MacroViewerProps {
-  height: number;
-  width: number;
-  source: string;
-}
 
 const MacroViewer: FC<MacroViewerProps> = ({
   height,
@@ -214,7 +165,6 @@ const MacroViewer: FC<MacroViewerProps> = ({
         <ambientLight intensity={0.5} />
         <pointLight position={[10, 10, 10]} />
         <VolumeViewer dataInfo={dataInfo} />
-        <SimpleTextureRenderer dataInfo={dataInfo} />
       </Canvas>
     </div>
   );
