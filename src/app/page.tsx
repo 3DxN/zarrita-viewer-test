@@ -12,7 +12,7 @@ export default function Home() {
 
         <div style={{ flex: '1' }}>
           <h2>Macro Viewer</h2>
-          <MacroViewer height={500} width={500}/>
+          <MacroViewer height={500} width={500} source={'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0026/3.66.9-6.141020_15-41-29.00.ome.zarr/0'}/>
         </div>
 
         <div style={{ flex: '1' }}>
