@@ -14,7 +14,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@hms-dbmi/viv": "^0.17.3",
+    "@hms-dbmi/viv": "^0.16.1",
     "next": "^15.3.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -27,20 +27,5 @@
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "^5.8.3",
     "vite": "^7.0.0"
-  },
-  "overrides": {
-    "@luma.gl/core": "9.0.9",
-    "@luma.gl/engine": "9.0.9",
-    "@luma.gl/experimental": "9.0.9",
-    "@luma.gl/gltf": "9.0.9",
-    "@luma.gl/shadertools": "9.0.9",
-    "@luma.gl/test-utils": "9.0.9",
-    "@luma.gl/webgl": "9.0.9",
-    "@deck.gl/core": "9.0.14",
-    "@deck.gl/layers": "9.0.14",
-    "@deck.gl/react": "9.0.14",
-    "@deck.gl/geo-layers": "9.0.14",
-    "@loaders.gl/core": "4.1.2",
-    "@loaders.gl/zarr": "4.1.2"
   }
 }

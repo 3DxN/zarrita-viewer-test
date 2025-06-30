@@ -24,7 +24,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
     // Load the OME-Zarr data when the component mounts
     const loadData = async () => {
       try {
-        const loader = await loadOmeZarr('http://localhost:5500/test_prostate_s1+crop.ome.zarr/0/', { type: 'multiscales' });
+        const loader = await loadOmeZarr('https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.4/idr0048A/9846151.zarr/0', { type: 'multiscales' });
         setSrc(loader.data);
         setImgLoaded(true);
         console.log('OME-Zarr data loaded successfully, data_type:', loader.data)
@@ -42,12 +42,13 @@ const MacroViewer: FC<MacroViewerProps> = ({
         <div style={{ width: `${width}px`, height: `${height}px`, position: 'relative' }}>
           {/*For some goddamn reason I'm getting the "Unsupported texture format 33326 Error: Unsupported texture format 33326" bug*/}
           <VolumeViewer
-            contrastLimits={[]} // Example contrast limits
-            channelsVisible={[true]} // Example channel, can be dynamic
-            selections={[{c: 0, t: 0, z: 0, x: 0, y: 0}]} // Example selections
+            contrastLimits={[[0, 1000], [0, 1000]]} // Example contrast limits
+            colors={[[0, 0, 255], [0, 0, 0]]}
+            channelsVisible={[true, true]} // Example channel, can be dynamic
+            selections={[{}]} // Example selections
             width={width}
             height={height}
-            loader={[src[3]]}
+            loader={src}
           />
         </div>
       ) : (
