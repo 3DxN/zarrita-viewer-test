@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useCallback, useEffect } from 'react'
+import * as zarrita from 'zarrita'
+
 import type { NavigationState, ZarrViewerProps } from '../../types/crossviewer'
 
 export default function ZarrViewer({
@@ -20,8 +22,6 @@ export default function ZarrViewer({
     if (!ctx) return
 
     try {
-      const zarrita = await import('zarrita')
-
       // Get array dimensions
       const width = arr.shape[arr.shape.length - 1]
       const height = arr.shape[arr.shape.length - 2]

@@ -15,6 +15,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
   const { store, root, omeData, availableResolutions, source } = useZarrStore()
   const [error, setError] = useState<string | null>(null);
   const [dataInfo, setDataInfo] = useState<any>(null);
+  const [isWaiting, setIsWaiting] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -22,6 +23,12 @@ const MacroViewer: FC<MacroViewerProps> = ({
         console.log('MacroViewer: Store not ready yet');
         return;
       }
+
+      // Add a delay to let CrossViewer load first
+      setIsWaiting(true);
+      console.log('MacroViewer: Waiting 1 second to give CrossViewer priority...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsWaiting(false);
 
       try {
         console.log('MacroViewer: Loading lowest resolution for 3D visualization');
@@ -145,7 +152,8 @@ const MacroViewer: FC<MacroViewerProps> = ({
   }, [store, root, omeData, availableResolutions]);
 
   if(error) return <div style={{color: 'red'}}>Error: {error}</div>
-  if(!dataInfo) return <div>Loading volume data...</div>
+  if(isWaiting) return <div style={{color: 'white', padding: '10px'}}>⏳ Waiting for CrossViewer to load first...</div>
+  if(!dataInfo) return <div style={{color: 'white', padding: '10px'}}>Loading volume data...</div>
 
   return (
     <div style={{ height, width, background: 'black' }}>
