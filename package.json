@@ -13,18 +13,16 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "_": "Don't change the versions of the first 3 dependencies, otherwise it will be painful for you. Trust me",
   "dependencies": {
-    "@hms-dbmi/viv": "0.17.2",
-    "@deck.gl/core": "~9.0.x",
-    "@luma.gl/core": "~9.0.x",
+    "@hms-dbmi/viv": "~0.17.2",
+    "deck.gl": "~9.0.0",
+    "zarrita": "~0.5.0",
     "@react-three/drei": "^10.3.0",
     "@react-three/fiber": "^9.1.4",
     "next": "^15.3.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "three": "^0.177.0",
-    "zarrita": "^0.5.2"
+    "three": "^0.177.0"
   },
   "devDependencies": {
     "@types/node": "24.0.4",
