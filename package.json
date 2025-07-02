@@ -13,8 +13,11 @@
     "start": "next start",
     "lint": "next lint"
   },
+  "_": "Don't change the versions of the first 3 dependencies, otherwise it will be painful for you. Trust me",
   "dependencies": {
-    "@hms-dbmi/viv": "^0.16.1",
+    "@hms-dbmi/viv": "0.17.2",
+    "@deck.gl/core": "~9.0.x",
+    "@luma.gl/core": "~9.0.x",
     "@react-three/drei": "^10.3.0",
     "@react-three/fiber": "^9.1.4",
     "next": "^15.3.4",
