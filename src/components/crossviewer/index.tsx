@@ -5,7 +5,7 @@ import ArrayLoader from '../common/ArrayLoader'
 import ZarrViewer from './viewer'
 import NavigationControls from './navigator'
 
-import type { CrossViewerProps, NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
+import type { NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
 
 
 export default function CrossViewer() {

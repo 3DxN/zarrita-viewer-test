@@ -1,11 +1,6 @@
 import React, { FC, useState, useEffect } from 'react';
 import { VolumeViewer, loadOmeZarr } from '@hms-dbmi/viv';
-
-// Define the types for the props our component will accept.
-interface MacroViewerProps {
-  height: number;
-  width: number;
-}
+import { MacroViewerProps } from '../../types/macroviewer';
 
 /**
  * MacroViewer is the primary, interactive 3D view of the imaging data.

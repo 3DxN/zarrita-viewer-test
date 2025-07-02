@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import * as zarrita from 'zarrita'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
-
-interface ArrayLoaderProps {
-  onArrayLoaded: (arr: any, arrayInfo: any) => void
-  onError: (error: string) => void
-  onLoadingChange: (loading: boolean) => void
-}
+import { ArrayLoaderProps } from '../../types/components'
 
 export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }: ArrayLoaderProps) {
   const { store, root, availableResolutions, availableChannels } = useZarrStore()
@@ -23,8 +19,10 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
     onLoadingChange(true)
     
     try {      
-      const zarrita = await import('zarrita')
-      const arr = await zarrita.open(root.resolve(selectedResolution), { kind: 'array' })
+      const arr = await zarrita.open(root.resolve(selectedResolution))
+      if (!(arr instanceof zarrita.Array)) {
+        throw new Error(`Expected an Array, but got ${arr.kind}`)
+      }
       
       const arrayInfo = {
         shape: arr.shape,
@@ -45,18 +43,7 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
   }
 
   if (!store) {
-    return (
-      <div style={{ 
-        padding: '15px', 
-        backgroundColor: '#fff3cd', 
-        color: '#856404',
-        borderRadius: '4px',
-        fontSize: '14px',
-        textAlign: 'center'
-      }}>
-        Please load a Zarr store first to select arrays
-      </div>
-    )
+    return <></>
   }
 
   return (

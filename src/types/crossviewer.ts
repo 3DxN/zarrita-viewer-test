@@ -1,7 +1,3 @@
-export interface CrossViewerProps {
-  // No props required - uses context
-}
-
 // Navigation state interface - holds current navigation values
 export interface NavigationState {
   xOffset: number
@@ -30,7 +26,7 @@ export interface NavigationHandlers {
 }
 
 // ZarrLoader component props
-export interface ZarrLoaderProps extends CrossViewerProps {
+export interface ZarrLoaderProps {
   onArrayLoaded: (array: any, arrayInfo: any) => void
   onError: (error: string) => void
   onLoadingChange: (loading: boolean) => void

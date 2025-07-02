@@ -5,25 +5,20 @@ import * as zarrita from 'zarrita';
 
 import VolumeViewer from './volumeviewer'; // Assuming this is in the same directory
 import { useZarrStore } from '../../contexts/ZarrStoreContext';
-import OMEAttrs from '../../types/ome';
-
-interface MacroViewerProps {
-  height: number;
-  width: number;
-}
+import type { MacroViewerProps } from '../../types/macroviewer';
 
 
 const MacroViewer: FC<MacroViewerProps> = ({
   height,
   width,
 }) => {
-  const { store, root, omeMetadata, availableResolutions, source } = useZarrStore()
+  const { store, root, omeData, availableResolutions, source } = useZarrStore()
   const [error, setError] = useState<string | null>(null);
   const [dataInfo, setDataInfo] = useState<any>(null);
 
   useEffect(() => {
     const loadData = async () => {
-      if (!store || !root || !omeMetadata || availableResolutions.length === 0) {
+      if (!store || !root || !omeData || availableResolutions.length === 0) {
         console.log('MacroViewer: Store not ready yet');
         return;
       }
@@ -31,7 +26,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
       try {
         console.log('MacroViewer: Loading lowest resolution for 3D visualization');
         
-        const multiscales = omeMetadata.multiscales?.[0];
+        const multiscales = omeData.multiscales?.[0];
         if (!multiscales) {
           throw new Error("Valid multiscale metadata not found.");
         }
@@ -44,7 +39,11 @@ const MacroViewer: FC<MacroViewerProps> = ({
         const lowestResPath = availableResolutions[availableResolutions.length - 1];
         console.log('MacroViewer: Loading lowest resolution path:', lowestResPath);
         
-        const arr = await zarrita.open(root.resolve(lowestResPath), { kind: 'array' });
+        const arr = await zarrita.open(root.resolve(lowestResPath));
+        if (!(arr instanceof zarrita.Array)) {
+          throw new Error(`Expected an Array, but got ${arr.kind}`);
+        }
+
         console.log("MacroViewer: Array loaded:", {
           shape: arr.shape,
           dtype: arr.dtype,
@@ -143,7 +142,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
       }
     };
     loadData();
-  }, [store, root, omeMetadata, availableResolutions]);
+  }, [store, root, omeData, availableResolutions]);
 
   if(error) return <div style={{color: 'red'}}>Error: {error}</div>
   if(!dataInfo) return <div>Loading volume data...</div>

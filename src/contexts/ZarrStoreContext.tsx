@@ -1,24 +1,11 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback } from 'react'
 import * as zarrita from 'zarrita'
-import OMEAttrs from '../types/ome'
 
-export interface ZarrStoreState {
-  store: zarrita.FetchStore | null
-  root: zarrita.Group<zarrita.FetchStore> | null
-  omeMetadata: OMEAttrs | null
-  availableResolutions: string[]
-  availableChannels: string[]
-  isLoading: boolean
-  error: string | null
-  source: string
-}
-
-export interface ZarrStoreContextType extends ZarrStoreState {
-  loadStore: (url: string) => Promise<void>
-  setSource: (url: string) => void
-}
+import type OMEAttrs from '../types/ome'
+import { ZarrStoreSuggestionType, type ZarrStoreSuggestedPath,
+  type ZarrStoreContextType, type ZarrStoreState, type ZarrStoreProviderProps } from '../types/store'
 
 const ZarrStoreContext = createContext<ZarrStoreContextType | null>(null)
 
@@ -30,21 +17,20 @@ export function useZarrStore() {
   return context
 }
 
-interface ZarrStoreProviderProps {
-  children: ReactNode
-  initialSource?: string
-}
-
 export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStoreProviderProps) {
   const [state, setState] = useState<ZarrStoreState>({
     store: null,
     root: null,
-    omeMetadata: null,
+    omeData: null,
     availableResolutions: [],
     availableChannels: [],
     isLoading: false,
     error: null,
-    source: initialSource
+    infoMessage: null,
+    source: initialSource,
+    hasLoadedStore: false,
+    suggestedPaths: [],
+    suggestionType: ZarrStoreSuggestionType.GENERIC
   })
 
   const setSource = useCallback((url: string) => {
@@ -52,24 +38,80 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
   }, [])
 
   const loadStore = useCallback(async (url: string) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }))
+    setState(prev => ({ ...prev, isLoading: true, error: null, infoMessage: null }))
     
     try {
       console.log('Loading Zarr store from:', url)
       
       const store = new zarrita.FetchStore(url)
-      const root = zarrita.root(store)
-      const grp = await zarrita.open(store, { kind: 'group' })
+      const grp = await zarrita.open(store)
       
-      if (!grp.attrs || !grp.attrs.ome) {
+      // Check if this is actually a group (not an array)
+      if (grp instanceof zarrita.Array) {
+        throw new Error("This appears to be an array, not a group. OME-Zarr requires group structure.")
+      }
+
+      console.log(grp, grp.attrs)
+
+      let omeMetadata: OMEAttrs | null = null
+      
+      if (grp.attrs.ome) {
+        omeMetadata = grp.attrs.ome
+      } else if (grp.attrs.multiscales) {
+        // If multiscales exist, we can treat this as OME-Zarr even without explicit OME attrs
+        omeMetadata = grp.attrs
+      } else {
         throw new Error("OME metadata not found in the group.")
       }
+            
+      // Check if this is a plate
+      if (omeMetadata.plate) {
+        console.log('Detected OME-Zarr plate structure')
+        setState(prev => ({
+          ...prev,
+          store,
+          root: grp,
+          omeData: omeMetadata,
+          availableResolutions: [],
+          availableChannels: [],
+          isLoading: false,
+          error: null,
+          infoMessage: 'Please select a well from the plate below to continue.',
+          source: url,
+          hasLoadedStore: false, // Keep false so modal stays open for well selection
+          suggestedPaths: [],
+          suggestionType: ZarrStoreSuggestionType.PLATE
+        }))
+        return
+      }
+
+      // Check if this is a well with multiple images
+      if (omeMetadata.well) {
+        console.log('Detected OME-Zarr well structure')
+        setState(prev => ({
+          ...prev,
+          store,
+          root: grp,
+          omeData: omeMetadata,
+          availableResolutions: [],
+          availableChannels: [],
+          isLoading: false,
+          error: null,
+          infoMessage: 'Please select an image from the well below to continue.',
+          source: url,
+          hasLoadedStore: false, // Keep false so modal stays open for image selection
+          suggestedPaths: [],
+          suggestionType: ZarrStoreSuggestionType.WELL
+        }))
+        return
+      }
       
-      const omeMetadata = grp.attrs.ome as OMEAttrs
+      // Check if multiscales exist
       const multiscales = omeMetadata.multiscales?.[0]
       
       if (!multiscales) {
-        throw new Error("Valid multiscale metadata not found.")
+        console.log('No multiscale found in OME metadata, suggesting subdirectories')
+        throw new Error("No multiscale metadata found.")
       }
       
       // Extract available resolutions
@@ -93,35 +135,149 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         ...prev,
         store,
         root: grp,
-        omeMetadata,
+        omeData: omeMetadata,
         availableResolutions,
         availableChannels,
         isLoading: false,
         error: null,
-        source: url
+        infoMessage: null,
+        source: url,
+        hasLoadedStore: true,
+        suggestedPaths: [],
+        suggestionType: ZarrStoreSuggestionType.GENERIC
       }))
       
     } catch (error) {
       console.error('Error loading Zarr store:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      let errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      
+      // Implement OME-Zarr specific error handling
+      let suggestedPaths: Array<ZarrStoreSuggestedPath> = []
+      let suggestionType: ZarrStoreSuggestionType = ZarrStoreSuggestionType.GENERIC
+      let errorOmeData: OMEAttrs | null = null
+      
+      try {
+        console.log('Exploring Zarr structure for OME-specific suggestions...')
+        const store: zarrita.FetchStore = new zarrita.FetchStore(url)
+        
+        // Try to open to check OME metadata
+        const opened = await zarrita.open(store)
+        
+        // Check if this is a group with attrs
+        if ('attrs' in opened && opened.attrs && opened.attrs.ome) {
+          const grp = opened as zarrita.Group<zarrita.FetchStore>
+          const omeMetadata = grp.attrs.ome as OMEAttrs
+          
+          // Case 1: Plate structure detected (even if there was an error)
+          if (omeMetadata.plate) {
+            console.log('Plate structure detected in OME metadata')
+            suggestionType = ZarrStoreSuggestionType.PLATE
+            errorOmeData = omeMetadata
+            
+            // For plate structure, we don't suggest paths here - the UI will handle plate display
+            // The plate metadata will be available in the error state
+          }
+          // Case 1.5: Well structure detected (even if there was an error)
+          else if (omeMetadata.well) {
+            console.log('Well structure detected in OME metadata')
+            suggestionType = ZarrStoreSuggestionType.WELL
+            errorOmeData = omeMetadata
+            
+            // For well structure, we don't suggest paths here - the UI will handle image display
+            // The well metadata will be available in the error state
+          }
+          // Case 2: OME metadata exists but no multiscale - this is invalid, suggest subdirectories
+          else if (!omeMetadata.multiscales || omeMetadata.multiscales.length === 0) {
+            console.log('OME metadata found but no multiscales - invalid OME-Zarr structure, suggesting subdirectories - hi test')
+            suggestionType = ZarrStoreSuggestionType.NO_MULTISCALE
+            
+            // Try to find common paths that might contain valid OME-Zarr data
+            const commonPaths = ['0', '1', '2', '3', '4', '5', 'labels', 'metadata']
+            for (const path of commonPaths) {
+              console.log(`Testing path: ${path}`)
+              const root = zarrita.root(store)
+              
+              // Check if this has OME metadata
+              try {
+                const childOpened = await zarrita.open(root.resolve(path))
+                
+                // Check if it's a group with OME metadata
+                if ('attrs' in childOpened && childOpened.attrs) {
+                  const hasOme = childOpened.attrs.ome || childOpened.attrs.multiscales
+                  
+                  suggestedPaths.push({
+                    path,
+                    isGroup: true,
+                    hasOme: !!hasOme
+                  })
+                } else {
+                  // It's an array
+                  suggestedPaths.push({
+                    path,
+                    isGroup: false,
+                    hasOme: false
+                  })
+                }
+              } catch {
+                // Do nothing - path doesn't exist
+              }
+            }
+          }
+        } else {
+          // Case 3: No OME metadata - fall back to generic exploration
+          console.log('No OME metadata found.')
+          suggestionType = ZarrStoreSuggestionType.GENERIC
+          // Don't suggest any paths for completely missing OME metadata
+        }
+        
+        // Sort suggestions: OME groups first, then other groups, then arrays
+        suggestedPaths.sort((a, b) => {
+          if (a.hasOme && !b.hasOme) return -1
+          if (!a.hasOme && b.hasOme) return 1
+          if (a.isGroup && !b.isGroup) return -1
+          if (!a.isGroup && b.isGroup) return 1
+          return a.path.localeCompare(b.path)
+        })
+        
+      } catch (explorationError) {
+        console.log('Could not explore structure:', explorationError)
+        
+        // If exploration fails completely, this is likely an invalid or inaccessible URL
+        suggestionType = ZarrStoreSuggestionType.GENERIC
+        errorMessage = "Could not explore OME-Zarr structure. Please check the URL or ensure it is a valid store."
+      }
       
       setState(prev => ({
         ...prev,
         store: null,
         root: null,
-        omeMetadata: null,
+        omeData: errorOmeData,
         availableResolutions: [],
         availableChannels: [],
         isLoading: false,
-        error: errorMessage
+        error: errorMessage,
+        infoMessage: null,
+        suggestedPaths,
+        suggestionType
       }))
     }
   }, [])
 
+  const navigateToSuggestion = useCallback(async (suggestionPath: string) => {
+    const currentUrl = state.source
+    const baseUrl = currentUrl.endsWith('/') ? currentUrl.slice(0, -1) : currentUrl
+    const newUrl = `${baseUrl}/${suggestionPath}`
+    
+    console.log(`Navigating from ${currentUrl} to ${newUrl}`)
+    setSource(newUrl)
+    await loadStore(newUrl)
+  }, [state.source, loadStore])
+
   const value: ZarrStoreContextType = {
     ...state,
     loadStore,
-    setSource
+    setSource,
+    navigateToSuggestion
   }
 
   return (

@@ -1,13 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import * as zarrita from 'zarrita'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
-
-interface ZarrLoaderProps {
-  onArrayLoaded: (arr: any, arrayInfo: any) => void
-  onError: (error: string) => void
-  onLoadingChange: (loading: boolean) => void
-}
+import { ZarrLoaderProps } from '../../types/crossviewer'
 
 export default function ZarrLoader({ onArrayLoaded, onError, onLoadingChange }: ZarrLoaderProps) {
   const { source, setSource, store, root, availableResolutions, availableChannels, loadStore, isLoading, error } = useZarrStore()
@@ -27,9 +23,12 @@ export default function ZarrLoader({ onArrayLoaded, onError, onLoadingChange }: 
 
     onLoadingChange(true)
     
-    try {      
-      const zarrita = await import('zarrita')
-      const arr = await zarrita.open(root.resolve(selectedResolution), { kind: 'array' })
+    try {
+      const arr = await zarrita.open(root.resolve(selectedResolution))
+
+      if (!(arr instanceof zarrita.Array)) {
+        throw new Error(`Expected an Array, but got ${arr.kind}`)
+      }
       
       const arrayInfo = {
         shape: arr.shape,
