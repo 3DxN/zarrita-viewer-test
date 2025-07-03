@@ -15,26 +15,15 @@ export default function Home() {
       <StoreLoader/>
       
       <div className="container" style={{ display: 'grid', gridTemplateColumns: '50% 50%', gap: '20px', marginTop: '20px', height: '100vh' }}>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-          <div style={{ flex: '1' }}>
-            <h2>Cross Viewer</h2>
-            <CrossViewer />
-          </div>
-
-          <div style={{ flex: '1' }}>
-            <h2>Macro Viewer</h2>
-            <CustomOmeZarrViewer height={500} width={500} />
-          </div>
-
+        <div>
+          <h2>Cross Viewer</h2>
+          <CrossViewer />
         </div>
         
         <div>
-          <h2>Feature Viewer</h2>
-          {/* <FeatureViewer height={600} width={500} /> */}
+          <h2>Macro Viewer</h2>
+          <CustomOmeZarrViewer height={500} width={500} />
         </div>
-
       </div>
     </ZarrStoreProvider>
   )

@@ -1,7 +1,9 @@
 'use client'
 
-import { useRef, useCallback, useEffect } from 'react'
-import * as zarrita from 'zarrita'
+import { useState, useEffect, useMemo } from 'react'
+import { PictureInPictureViewer } from '@hms-dbmi/viv'
+import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
+import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
 import type { NavigationState, ZarrViewerProps } from '../../types/crossviewer'
 
@@ -12,120 +14,205 @@ export default function ZarrViewer({
   loading,
   onError
 }: ZarrViewerProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const { omeData } = useZarrStore()
+  const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
 
-  const renderImageRegion = useCallback(async (arr: any, navState: NavigationState) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
+  // Create Viv loaders from the current array
+  const createVivLoaders = useMemo(() => {
+    if (!currentArray || !arrayInfo) return []
 
     try {
-      // Get array dimensions
-      const width = arr.shape[arr.shape.length - 1]
-      const height = arr.shape[arr.shape.length - 2]
+      // Determine the axis labels based on array shape
+      const shape = currentArray.shape
+      let labels: string[] = []
       
-      // Clamp values to valid ranges
-      const clampedTimeSlice = Math.min(navState.timeSlice, arr.shape.length >= 4 ? arr.shape[0] - 1 : 0)
-      const clampedChannel = Math.min(navState.currentChannel, arr.shape.length >= 4 ? 
-        (arr.shape.length === 5 ? arr.shape[1] - 1 : arr.shape[0] - 1) : 0)
-      const clampedZSlice = Math.min(navState.zSlice, arr.shape.length >= 3 ? 
-        arr.shape[arr.shape.length - 3] - 1 : 0)
-      const clampedXOffset = Math.min(navState.xOffset, width - 1)
-      const clampedYOffset = Math.min(navState.yOffset, height - 1)
-      
-      // Calculate region size (max 256x256)
-      const regionWidth = Math.min(256, width - clampedXOffset)
-      const regionHeight = Math.min(256, height - clampedYOffset)
-
-      // Create selection for the region
-      const selection = []
-      
-      // Handle different array shapes
-      if (arr.shape.length === 5) {
-        selection.push(clampedTimeSlice)
-        selection.push(clampedChannel)
-        selection.push(clampedZSlice)
-        selection.push(zarrita.slice(clampedYOffset, clampedYOffset + regionHeight))
-        selection.push(zarrita.slice(clampedXOffset, clampedXOffset + regionWidth))
-      } else if (arr.shape.length === 4) {
-        selection.push(clampedChannel)
-        selection.push(clampedZSlice)
-        selection.push(zarrita.slice(clampedYOffset, clampedYOffset + regionHeight))
-        selection.push(zarrita.slice(clampedXOffset, clampedXOffset + regionWidth))
-      } else if (arr.shape.length === 3) {
-        selection.push(clampedZSlice)
-        selection.push(zarrita.slice(clampedYOffset, clampedYOffset + regionHeight))
-        selection.push(zarrita.slice(clampedXOffset, clampedXOffset + regionWidth))
+      if (shape.length === 5) {
+        labels = ['t', 'c', 'z', 'y', 'x']
+      } else if (shape.length === 4) {
+        // Could be CZYX or TZYX - assume CZYX for now
+        labels = ['c', 'z', 'y', 'x']
+      } else if (shape.length === 3) {
+        labels = ['z', 'y', 'x']
+      } else if (shape.length === 2) {
+        labels = ['y', 'x']
       } else {
-        selection.push(zarrita.slice(clampedYOffset, clampedYOffset + regionHeight))
-        selection.push(zarrita.slice(clampedXOffset, clampedXOffset + regionWidth))
+        throw new Error(`Unsupported array shape: ${shape}`)
       }
 
-      const imageData = await zarrita.get(arr, selection)
-      const { data, shape } = imageData
-      
-      // Get actual dimensions from the slice result
-      const actualHeight = shape[shape.length - 2]
-      const actualWidth = shape[shape.length - 1]
-      
-      canvas.width = actualWidth
-      canvas.height = actualHeight
-
-      const imageDataCanvas = ctx.createImageData(actualWidth, actualHeight)
-      
-      // Normalize data to 0-255 range
-      const dataArray = Array.from(data as ArrayLike<number>)
-      const min = Math.min(...dataArray)
-      const max = Math.max(...dataArray)
-      const range = max - min || 1
-      
-      // Convert to grayscale RGBA
-      for (let i = 0; i < dataArray.length && i < actualWidth * actualHeight; i++) {
-        const normalized = Math.floor(((dataArray[i] - min) / range) * 255)
-        const pixelIndex = i * 4
-        
-        imageDataCanvas.data[pixelIndex] = normalized
-        imageDataCanvas.data[pixelIndex + 1] = normalized
-        imageDataCanvas.data[pixelIndex + 2] = normalized
-        imageDataCanvas.data[pixelIndex + 3] = 255
-      }
-      
-      ctx.putImageData(imageDataCanvas, 0, 0)
-    } catch (err) {
-      onError(`Error rendering image: ${err instanceof Error ? err.message : 'Unknown error'}`)
-    }
-  }, [onError])
-
-  // Update image when navigation parameters change
-  useEffect(() => {
-    if (currentArray) {
-      renderImageRegion(currentArray, navigationState)
-    }
-  }, [currentArray, navigationState, renderImageRegion])
-
-  // Log array info to console when it changes
-  useEffect(() => {
-    if (arrayInfo) {
-      console.log('Array Info:', {
-        shape: arrayInfo.shape,
-        dtype: arrayInfo.dtype,
-        chunks: arrayInfo.chunks
+      // Create a single loader for the full resolution
+      const loader = new AltZarrPixelSource(currentArray, {
+        labels: labels as any, // Type assertion for Viv's complex label typing
+        tileSize: 256
       })
+
+      return [loader]
+    } catch (error) {
+      console.error('Failed to create Viv loaders:', error)
+      onError(`Failed to create Viv loaders: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      return []
     }
-  }, [arrayInfo])
+  }, [currentArray, arrayInfo, onError])
+
+  useEffect(() => {
+    setVivLoaders(createVivLoaders)
+  }, [createVivLoaders])
+
+  // Calculate selection based on navigation state
+  const selection = useMemo(() => {
+    if (!currentArray) return {}
+
+    const selection: Record<string, number> = {}
+    const shape = currentArray.shape
+
+    if (shape.length >= 4) {
+      selection.c = navigationState.currentChannel
+    }
+    if (shape.length >= 3) {
+      selection.z = navigationState.zSlice
+    }
+    if (shape.length >= 5) {
+      selection.t = navigationState.timeSlice
+    }
+
+    return selection
+  }, [currentArray, navigationState])
+
+  // Generate dynamic colors and contrast limits
+  const colorAndContrast = useMemo(() => {
+    if (!currentArray) return { colors: [[255, 255, 255]], contrastLimits: [[0, 4095]] }
+
+    // Default color palette for multiple channels
+    const defaultColors = [
+      [255, 0, 0],   // Red
+      [0, 255, 0],   // Green  
+      [0, 0, 255],   // Blue
+      [255, 255, 0], // Yellow
+      [255, 0, 255], // Magenta
+      [0, 255, 255], // Cyan
+      [255, 128, 0], // Orange
+      [128, 0, 255]  // Purple
+    ]
+
+    // Determine number of channels
+    const shape = currentArray.shape
+    let numChannels = 1
+    if (shape.length >= 4) {
+      if (shape.length === 5) {
+        numChannels = shape[1] // TCZYX
+      } else if (shape.length === 4) {
+        numChannels = shape[0] <= 10 ? shape[0] : 1 // CZYX (assume C if small number)
+      }
+    }
+
+    // Get color for current channel or use first channel color if single channel
+    const channelIndex = navigationState.currentChannel || 0
+    const color = defaultColors[channelIndex % defaultColors.length]
+
+    // Try to get better contrast limits from OME metadata
+    let contrastMin = 0
+    let contrastMax = 4095
+    
+    if (omeData?.multiscales?.[0]?.datasets?.[0]?.transforms?.[0]?.scale) {
+      // Use dtype to determine better contrast limits
+      const dtype = currentArray.dtype || 'uint16'
+      if (dtype.includes('uint8')) {
+        contrastMax = 255
+      } else if (dtype.includes('uint16')) {
+        contrastMax = 65535
+      } else if (dtype.includes('float')) {
+        contrastMax = 1.0
+      }
+    }
+
+    return {
+      colors: [color],
+      contrastLimits: [[contrastMin, contrastMax]]
+    }
+  }, [currentArray, navigationState.currentChannel, omeData])
+
+  if (loading) {
+    return (
+      <div style={{ 
+        width: '512px', 
+        height: '400px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        border: '1px solid #ddd',
+        backgroundColor: '#f9f9f9'
+      }}>
+        Loading...
+      </div>
+    )
+  }
+
+  if (!currentArray || !arrayInfo || vivLoaders.length === 0) {
+    return (
+      <div style={{ 
+        width: '512px', 
+        height: '256px', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        border: '1px solid #ddd',
+        backgroundColor: '#f9f9f9'
+      }}>
+        No data loaded
+      </div>
+    )
+  }
 
   return (
-    <canvas 
-      ref={canvasRef}
+    <div 
+      className="viv-viewer-container"
       style={{ 
-        maxWidth: arrayInfo ? '100%' : '256px',
-        minHeight: arrayInfo ? 'auto' : '256px',
+        width: '512px', 
+        height: '400px',
+        position: 'relative',
+        overflow: 'hidden',
         border: '1px solid #ddd',
-        display: loading ? 'none' : 'block',
-        backgroundColor: '#f9f9f9'
+        borderRadius: '4px',
+        // Ensure this container captures and constrains events
+        isolation: 'isolate',
+        // Add transform to create a new stacking context
+        transform: 'translateZ(0)',
+        // Contain layout and style to prevent leakage
+        contain: 'layout style'
       }}
-    />
+      onMouseLeave={(e) => {
+        // Prevent event bubbling when mouse leaves the viewer area
+        e.stopPropagation()
+      }}
+      onMouseEnter={(e) => {
+        // Ensure focus is captured when entering the viewer
+        e.currentTarget.focus()
+      }}
+      tabIndex={0} // Make the container focusable
+    >
+      <div style={{
+        width: '100%',
+        height: '100%',
+        position: 'relative'
+      }}>
+        <PictureInPictureViewer
+          loader={vivLoaders}
+          selections={[selection]}
+          height={400}
+          width={512}
+          overview={{
+            height: 128,
+            width: 128,
+            zoom: -6
+          }}
+          overviewOn={true}
+          contrastLimits={colorAndContrast.contrastLimits}
+          colors={colorAndContrast.colors}
+          channelsVisible={[true]}
+          onViewportLoad={() => {
+            console.log('Viewport loaded')
+          }}
+        />
+      </div>
+    </div>
   )
 }

@@ -10,7 +10,7 @@ import type { NavigationState, NavigationLimits, NavigationHandlers } from '../.
 
 
 export default function CrossViewer() {
-  const { availableChannels } = useZarrStore()
+  const { availableChannels, omeData } = useZarrStore()
   const [loading, setLoading] = useState(false)
   const [_, setError] = useState<string | null>(null)
   const [arrayInfo, setArrayInfo] = useState<any>(null)
@@ -109,7 +109,17 @@ export default function CrossViewer() {
   }, [])
 
   return (
-    <div style={{ border: '1px solid #dee2e6', padding: '15px', borderRadius: '8px', backgroundColor: 'white' }}>
+    <div style={{ 
+      border: '1px solid #dee2e6', 
+      padding: '15px', 
+      borderRadius: '8px', 
+      backgroundColor: 'white',
+      minHeight: '450px'
+    }}>
+      <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
+        Cross-Section Viewer with Map Overview
+      </h3>
+      
       <ArrayLoader
         onArrayLoaded={handleArrayLoaded}
         onError={handleError}
@@ -121,8 +131,9 @@ export default function CrossViewer() {
           display: 'flex', 
           gap: '20px', 
           alignItems: 'flex-start',
+          marginTop: '15px'
         }}>
-          <div style={{ flex: 1, minWidth: '20%' }}>
+          <div style={{ flex: 1, minWidth: '60%' }}>
             <ZarrViewer
               currentArray={currentArray}
               arrayInfo={arrayInfo}
@@ -139,6 +150,16 @@ export default function CrossViewer() {
             navigationHandlers={navigationHandlers}
             channelNames={availableChannels}
           />
+        </div>
+      ) : !loading ? (
+        <div style={{ 
+          marginTop: '15px',
+          padding: '20px',
+          textAlign: 'center',
+          color: '#6c757d',
+          fontStyle: 'italic'
+        }}>
+          Load a Zarr array to begin exploring with map-like navigation
         </div>
       ) : (
         <ZarrViewer

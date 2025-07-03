@@ -30,6 +30,23 @@ export default function NavigationControls({
       borderRadius: '5px',
       flexShrink: 0
     }}>
+      <h4 style={{ margin: '0 0 15px 0', fontSize: '16px', fontWeight: 'bold' }}>
+        Navigation Controls
+      </h4>
+      
+      {/* Info about the viewer */}
+      <div style={{ 
+        marginBottom: '15px', 
+        padding: '10px', 
+        backgroundColor: '#e3f2fd', 
+        borderRadius: '3px',
+        fontSize: '12px',
+        lineHeight: '1.4'
+      }}>
+        📍 <strong>Map Overview:</strong> Use the small overview window to navigate around the full image. 
+        The current view is shown as a selection frame.
+      </div>
+
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
           Channels:

@@ -14,3 +14,24 @@ body {
   margin: 0 auto;
   padding: 20px;
 }
+
+/* Viv viewer container isolation */
+.viv-viewer-container {
+  /* Create a new stacking context to isolate deck.gl events */
+  position: relative;
+  z-index: 1;
+}
+
+.viv-viewer-container canvas {
+  /* Ensure canvas events are contained within the viewer */
+  pointer-events: auto !important;
+}
+
+/* Prevent deck.gl from capturing events outside the container */
+.viv-viewer-container .deck-canvas {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+}
