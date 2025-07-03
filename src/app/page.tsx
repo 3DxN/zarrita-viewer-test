@@ -3,8 +3,7 @@
 import React from 'react'
 
 import CrossViewer from '../components/crossviewer'
-import MacroViewer from '../components/macroviewer'
-import CustomOmeZarrViewer from '../components/featureviewer/CustomOmeZarrViewer'
+import CustomOmeZarrViewer from '../components/macroviewer/Viewer'
 import StoreLoader from '../components/common/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext' 
 
@@ -15,7 +14,7 @@ export default function Home() {
     <ZarrStoreProvider initialSource={initialSource}>
       <StoreLoader/>
       
-      <div className="container" style={{ display: 'grid', gridTemplateColumns: '40% 60%', gap: '20px', marginTop: '20px', height: '100vh' }}>
+      <div className="container" style={{ display: 'grid', gridTemplateColumns: '50% 50%', gap: '20px', marginTop: '20px', height: '100vh' }}>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
@@ -26,15 +25,14 @@ export default function Home() {
 
           <div style={{ flex: '1' }}>
             <h2>Macro Viewer</h2>
-            <MacroViewer height={500} width={500} />
+            <CustomOmeZarrViewer height={500} width={500} />
           </div>
 
         </div>
         
-        {/* Right column: Feature viewer (main viewer) */}
         <div>
-          <h2>Custom OME-Zarr Viewer</h2>
-          <CustomOmeZarrViewer height={600} width={500} />
+          <h2>Feature Viewer</h2>
+          {/* <FeatureViewer height={600} width={500} /> */}
         </div>
 
       </div>

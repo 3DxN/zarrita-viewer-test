@@ -1,4 +1,3 @@
-import type { ZarrPixelSource } from "@hms-dbmi/viv"
 import type { AltZarrPixelSource } from "../ext/AltZarrPixelSource"
 
 export interface VivLoaderConfig {
@@ -10,7 +9,7 @@ export interface VivLoaderConfig {
 }
 
 export interface VivCompatibleData {
-  loader: (ZarrPixelSource<string[]> | AltZarrPixelSource)[]
+  loader: (AltZarrPixelSource)[]
   metadata: {
     axis_labels: string[]
     model_matrix: number[][]

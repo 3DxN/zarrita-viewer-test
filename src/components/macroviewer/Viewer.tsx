@@ -6,14 +6,18 @@ import { VolumeViewer } from '@hms-dbmi/viv'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 import { createVivLoader } from '../../lib/viv-omezarr-bridge'
 import type { VivCompatibleData } from '../../types/viv'
-import type { MacroViewerProps } from '../../types/macroviewer'
+
+interface CustomOmeZarrViewerProps {
+  height?: number
+  width?: number
+}
 
 /**
- * MacroViewer using our custom data pipeline with central store and AltZarrPixelSource
+ * Custom OME-Zarr Viewer using our custom data pipeline with central store
  * This component waits for the central ZarrStore to load data, then creates Viv-compatible loaders
- * Now using AltZarrPixelSource for robust dtype handling - no more 1-second delay needed!
+ * Now using AltZarrPixelSource for robust dtype handling
  */
-const MacroViewer: FC<MacroViewerProps> = ({
+const CustomOmeZarrViewer: FC<CustomOmeZarrViewerProps> = ({
   height = 400,
   width = 400
 }) => {
@@ -33,29 +37,29 @@ const MacroViewer: FC<MacroViewerProps> = ({
       setError(null)
       
       try {
-        console.log('🔍 MacroViewer: Creating Viv loader from central store...')
+        console.log('🔍 CustomOmeZarrViewer: Creating Viv loader from central store...')
         console.log('📊 Store data:', { source, hasLoadedStore, omeData })
         
         // Use the central store data to create Viv-compatible loaders
         const vivCompatibleData = await createVivLoader({
           source,
-          name: 'MacroViewer',
+          name: 'Custom OME-Zarr Viewer',
           opacity: 1.0
         })
         
-        console.log('🎉 MacroViewer Viv data created successfully:', vivCompatibleData)
+        console.log('🎉 Viv data created successfully:', vivCompatibleData)
         setVivData(vivCompatibleData)
         
         // Log detailed debug information about the loaders
         if (vivCompatibleData.loader && vivCompatibleData.loader.length > 0) {
           const firstLoader = vivCompatibleData.loader[0]
-          console.log('🔍 MacroViewer first loader dtype check:', firstLoader.dtype)
-          console.log('📊 MacroViewer first loader shape:', firstLoader.shape)
-          console.log('🏷️ MacroViewer first loader labels:', firstLoader.labels)
+          console.log('🔍 First loader dtype check:', firstLoader.dtype)
+          console.log('📊 First loader shape:', firstLoader.shape)
+          console.log('🏷️ First loader labels:', firstLoader.labels)
           
           // Use the lowest resolution (last in array) for performance
           const lowestResLoader = vivCompatibleData.loader[vivCompatibleData.loader.length - 1]
-          console.log('🔽 MacroViewer using lowest resolution loader:', {
+          console.log('🔽 Using lowest resolution loader:', {
             dtype: lowestResLoader.dtype,
             shape: lowestResLoader.shape,
             labels: lowestResLoader.labels
@@ -63,7 +67,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
         }
         
       } catch (error) {
-        console.error('❌ MacroViewer: Failed to create Viv data:', error)
+        console.error('❌ CustomOmeZarrViewer: Failed to create Viv data:', error)
         setError(error instanceof Error ? error.message : 'Failed to load data')
       } finally {
         setLoading(false)
@@ -122,7 +126,7 @@ const MacroViewer: FC<MacroViewerProps> = ({
   // Use the lowest resolution loader for VolumeViewer (better performance)
   const loaderToUse = vivData.loader[vivData.loader.length - 1]
   
-  console.log('🎬 MacroViewer: Rendering VolumeViewer with:', {
+  console.log('🎬 CustomOmeZarrViewer: Rendering VolumeViewer with:', {
     loaderDtype: loaderToUse.dtype,
     loaderShape: loaderToUse.shape,
     metadata: vivData.metadata
@@ -146,4 +150,4 @@ const MacroViewer: FC<MacroViewerProps> = ({
   )
 }
 
-export default MacroViewer
+export default CustomOmeZarrViewer
