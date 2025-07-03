@@ -12,7 +12,6 @@ body {
 .container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
 }
 
 /* Viv viewer container isolation */
@@ -20,6 +19,9 @@ body {
   /* Create a new stacking context to isolate deck.gl events */
   position: relative;
   z-index: 1;
+  /* Ensure the container can flex properly */
+  display: flex;
+  flex-direction: column;
 }
 
 .viv-viewer-container canvas {

@@ -16,12 +16,10 @@ export default function Home() {
       
       <div className="container" style={{ display: 'grid', gridTemplateColumns: '50% 50%', gap: '20px', marginTop: '20px', height: '100vh' }}>
         <div>
-          <h2>Cross Viewer</h2>
           <CrossViewer />
         </div>
         
         <div>
-          <h2>Macro Viewer</h2>
           <CustomOmeZarrViewer height={500} width={500} />
         </div>
       </div>

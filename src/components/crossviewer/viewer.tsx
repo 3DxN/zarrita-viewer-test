@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { PictureInPictureViewer } from '@hms-dbmi/viv'
 import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
@@ -16,6 +16,31 @@ export default function ZarrViewer({
 }: ZarrViewerProps) {
   const { omeData } = useZarrStore()
   const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
+  const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Hook to observe container size changes
+  const updateDimensions = useCallback(() => {
+    if (containerRef.current) {
+      const { clientWidth, clientHeight } = containerRef.current
+      setContainerDimensions({ 
+        width: Math.max(clientWidth, 400), // Minimum width
+        height: Math.max(clientHeight, 400) // Minimum height
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    updateDimensions()
+    
+    // Set up ResizeObserver to watch for container size changes
+    const resizeObserver = new ResizeObserver(updateDimensions)
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current)
+    }
+    
+    return () => resizeObserver.disconnect()
+  }, [updateDimensions])
 
   // Create Viv loaders from the current array
   const createVivLoaders = useMemo(() => {
@@ -132,46 +157,58 @@ export default function ZarrViewer({
 
   if (loading) {
     return (
-      <div style={{ 
-        width: '512px', 
-        height: '400px', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        border: '1px solid #ddd',
-        backgroundColor: '#f9f9f9'
-      }}>
-        Loading...
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          minHeight: '400px',
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f9f9f9'
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>Loading...</div>
+          <div style={{ fontSize: '14px', color: '#6c757d' }}>Preparing map viewer</div>
+        </div>
       </div>
     )
   }
 
   if (!currentArray || !arrayInfo || vivLoaders.length === 0) {
     return (
-      <div style={{ 
-        width: '512px', 
-        height: '256px', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        border: '1px solid #ddd',
-        backgroundColor: '#f9f9f9'
-      }}>
-        No data loaded
+      <div 
+        ref={containerRef}
+        style={{ 
+          width: '100%', 
+          height: '100%',
+          minHeight: '400px',
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#f9f9f9'
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '18px', marginBottom: '10px' }}>No data loaded</div>
+          <div style={{ fontSize: '14px', color: '#6c757d' }}>Load a Zarr array to begin viewing</div>
+        </div>
       </div>
     )
   }
 
   return (
     <div 
+      ref={containerRef}
       className="viv-viewer-container"
       style={{ 
-        width: '512px', 
-        height: '400px',
+        width: '100%', 
+        height: '100%',
+        minHeight: '400px',
         position: 'relative',
         overflow: 'hidden',
-        border: '1px solid #ddd',
-        borderRadius: '4px',
         // Ensure this container captures and constrains events
         isolation: 'isolate',
         // Add transform to create a new stacking context
@@ -189,30 +226,23 @@ export default function ZarrViewer({
       }}
       tabIndex={0} // Make the container focusable
     >
-      <div style={{
-        width: '100%',
-        height: '100%',
-        position: 'relative'
-      }}>
-        <PictureInPictureViewer
-          loader={vivLoaders}
-          selections={[selection]}
-          height={400}
-          width={512}
-          overview={{
-            height: 128,
-            width: 128,
-            zoom: -6
-          }}
-          overviewOn={true}
-          contrastLimits={colorAndContrast.contrastLimits}
-          colors={colorAndContrast.colors}
-          channelsVisible={[true]}
-          onViewportLoad={() => {
-            console.log('Viewport loaded')
-          }}
-        />
-      </div>
+      <PictureInPictureViewer
+        loader={vivLoaders}
+        selections={[selection]}
+        height={containerDimensions.height}
+        width={containerDimensions.width}
+        overview={{
+          maximumWidth: 100, 
+          maximumHeight: 100,
+        }}
+        overviewOn={true}
+        contrastLimits={colorAndContrast.contrastLimits}
+        colors={colorAndContrast.colors}
+        channelsVisible={[true]}
+        onViewportLoad={() => {
+          console.log('Viewport loaded with dimensions:', containerDimensions)
+        }}
+      />
     </div>
   )
 }

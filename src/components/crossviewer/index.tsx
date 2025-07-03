@@ -117,16 +117,11 @@ export default function CrossViewer() {
 
   return (
     <div style={{ 
-      border: '1px solid #dee2e6', 
-      padding: '15px', 
-      borderRadius: '8px', 
-      backgroundColor: 'white',
-      minHeight: '450px'
+      height: '100%', // Take height from parent
+      minHeight: '500px', // Minimum usable height
+      display: 'flex',
+      flexDirection: 'column'
     }}>
-      <h3 style={{ margin: '0 0 15px 0', fontSize: '18px', fontWeight: 'bold' }}>
-        Cross-Section Viewer with Map Overview
-      </h3>
-      
       <ArrayLoader
         onArrayLoaded={handleArrayLoaded}
         onError={handleError}
@@ -143,10 +138,16 @@ export default function CrossViewer() {
         <div style={{ 
           display: 'flex', 
           gap: '20px', 
-          alignItems: 'flex-start',
-          marginTop: '15px'
+          alignItems: 'stretch', // Stretch to fill height
+          flex: 1, // Take remaining space
+          minHeight: 0 // Allow flex child to shrink
         }}>
-          <div style={{ flex: 1, minWidth: '60%' }}>
+          <div style={{ 
+            flex: 1, 
+            minWidth: '60%',
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
             <ZarrViewer
               currentArray={currentArray}
               arrayInfo={arrayInfo}
@@ -169,7 +170,6 @@ export default function CrossViewer() {
         </div>
       ) : !loading ? (
         <div style={{ 
-          marginTop: '15px',
           padding: '20px',
           textAlign: 'center',
           color: '#6c757d',
