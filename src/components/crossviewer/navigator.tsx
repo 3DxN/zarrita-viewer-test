@@ -8,11 +8,14 @@ export default function NavigationControls({
   navigationState,
   navigationLimits,
   navigationHandlers,
-  channelNames
+  channelNames,
+  availableResolutions,
+  selectedResolution,
+  onResolutionChange
 }: NavigationControlsProps) {
   const { xOffset, yOffset, zSlice, timeSlice, currentChannel } = navigationState
-  const { maxXOffset, maxYOffset, maxZSlice, maxTimeSlice, numChannels } = navigationLimits
-  const { onXOffsetChange, onYOffsetChange, onZSliceChange, onTimeSliceChange, onChannelChange } = navigationHandlers
+  const { maxZSlice, maxTimeSlice, numChannels } = navigationLimits
+  const { onZSliceChange, onTimeSliceChange, onChannelChange } = navigationHandlers
 
   // Function to get channel display name
   const getChannelName = (index: number) => {
@@ -34,18 +37,33 @@ export default function NavigationControls({
         Navigation Controls
       </h4>
       
-      {/* Info about the viewer */}
-      <div style={{ 
-        marginBottom: '15px', 
-        padding: '10px', 
-        backgroundColor: '#e3f2fd', 
-        borderRadius: '3px',
-        fontSize: '12px',
-        lineHeight: '1.4'
-      }}>
-        📍 <strong>Map Overview:</strong> Use the small overview window to navigate around the full image. 
-        The current view is shown as a selection frame.
-      </div>
+      {/* Resolution Selection */}
+      {availableResolutions && availableResolutions.length > 1 && (
+        <div style={{ marginBottom: '20px' }}>
+          <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+            Resolution Level:
+          </label>
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+            {availableResolutions.map((resolution) => (
+              <button
+                key={resolution}
+                onClick={() => onResolutionChange?.(resolution)}
+                style={{
+                  backgroundColor: selectedResolution === resolution ? '#007bff' : '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  padding: '5px 10px',
+                  borderRadius: '3px',
+                  cursor: 'pointer',
+                  fontSize: '12px'
+                }}
+              >
+                {resolution}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ marginBottom: '20px' }}>
         <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
@@ -72,30 +90,28 @@ export default function NavigationControls({
         </div>
       </div>
 
+      {/* Current Coordinates Display */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+          Current View:
+        </label>
+        <div style={{ 
+          padding: '10px', 
+          backgroundColor: '#e9ecef', 
+          borderRadius: '4px',
+          fontSize: '12px',
+          fontFamily: 'monospace'
+        }}>
+          <div>X: {xOffset} - {Math.min(xOffset + 256, arrayInfo.shape[arrayInfo.shape.length - 1])}</div>
+          <div>Y: {yOffset} - {Math.min(yOffset + 256, arrayInfo.shape[arrayInfo.shape.length - 2])}</div>
+          <div style={{ marginTop: '5px', fontSize: '11px', color: '#6c757d' }}>
+            Total: {arrayInfo.shape[arrayInfo.shape.length - 1]} × {arrayInfo.shape[arrayInfo.shape.length - 2]}
+          </div>
+        </div>
+      </div>
+
       {/* Navigation sliders */}
       <div style={{ display: 'grid', gap: '15px', marginBottom: '5px' }}>
-        <Slider
-          label="X Offset"
-          value={xOffset}
-          min={0}
-          max={maxXOffset}
-          onChange={onXOffsetChange}
-          valueDisplay={(value, max) => 
-            `(${value}-${Math.min(value + 256, arrayInfo.shape[arrayInfo.shape.length - 1])})/${arrayInfo.shape[arrayInfo.shape.length - 1]}`
-          }
-        />
-
-        <Slider
-          label="Y Offset"
-          value={yOffset}
-          min={0}
-          max={maxYOffset}
-          onChange={onYOffsetChange}
-          valueDisplay={(value, max) => 
-            `(${value}-${Math.min(value + 256, arrayInfo.shape[arrayInfo.shape.length - 2])})/${arrayInfo.shape[arrayInfo.shape.length - 2]}`
-          }
-        />
-
         <Slider
           label="Z Slice"
           value={zSlice}

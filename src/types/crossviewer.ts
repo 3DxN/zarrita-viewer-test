@@ -48,6 +48,10 @@ export interface NavigationControlsProps {
   navigationLimits: NavigationLimits
   navigationHandlers: NavigationHandlers
   channelNames?: string[]
+  // Resolution control props
+  availableResolutions?: string[]
+  selectedResolution?: string
+  onResolutionChange?: (resolution: string) => void
 }
 
 // NavigationSlider component props

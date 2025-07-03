@@ -5,10 +5,19 @@ import * as zarrita from 'zarrita'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 import { ArrayLoaderProps } from '../../types/components'
 
-export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }: ArrayLoaderProps) {
+export default function ArrayLoader({ 
+  onArrayLoaded, 
+  onError, 
+  onLoadingChange, 
+  externalResolution, 
+  onResolutionUsed 
+}: ArrayLoaderProps) {
   const { store, root, availableResolutions, availableChannels } = useZarrStore()
   const [selectedResolution, setSelectedResolution] = useState('0')
   const [selectedChannel, setSelectedChannel] = useState(0)
+
+  // Use external resolution if provided
+  const effectiveResolution = externalResolution || selectedResolution
 
   // Auto-load lowest resolution when store is loaded - prioritize fast loading
   useEffect(() => {
@@ -16,10 +25,18 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
       if (store && availableResolutions.length > 0) {
         // Get the lowest resolution (highest index in the array)
         const lowestResolution = availableResolutions[availableResolutions.length - 1]
-        setSelectedResolution(lowestResolution)
+        const resolutionToUse = externalResolution || lowestResolution
+        
+        if (!externalResolution) {
+          setSelectedResolution(resolutionToUse)
+        }
+        
         // Auto-load immediately - CrossViewer priority
-        console.log('ArrayLoader: Loading lowest resolution immediately for CrossViewer')
-        await loadArrayFromStore(lowestResolution, selectedChannel)
+        console.log('ArrayLoader: Loading resolution', resolutionToUse, 'immediately for CrossViewer')
+        await loadArrayFromStore(resolutionToUse, selectedChannel)
+        
+        // Notify parent of resolution being used
+        onResolutionUsed?.(resolutionToUse)
       }
     }
     
@@ -27,7 +44,15 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
     if (store) {
       setTimeout(loadLowestRes, 100)
     }
-  }, [store, availableResolutions])
+  }, [store, availableResolutions, externalResolution])
+
+  // Load when external resolution changes
+  useEffect(() => {
+    if (externalResolution && store) {
+      loadArrayFromStore(externalResolution, selectedChannel)
+      onResolutionUsed?.(externalResolution)
+    }
+  }, [externalResolution, store])
 
   // Auto-load when resolution is changed
   const handleResolutionChange = (resolution: string) => {
@@ -42,7 +67,7 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
   }
 
   const loadArrayFromStore = async (resolution?: string, channel?: number) => {
-    const resolutionToLoad = resolution || selectedResolution
+    const resolutionToLoad = resolution || effectiveResolution
     const channelToLoad = channel !== undefined ? channel : selectedChannel
     
     if (!store || !root) {
@@ -80,6 +105,12 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
     return <></>
   }
 
+  // When using external resolution control, don't render any UI
+  if (externalResolution) {
+    return <></>
+  }
+
+  // Only show resolution buttons when not externally controlled (for backward compatibility)
   return (
     <div style={{ marginBottom: '15px', flex: 1 }}>
       <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>

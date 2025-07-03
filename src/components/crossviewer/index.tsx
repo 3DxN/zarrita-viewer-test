@@ -10,11 +10,12 @@ import type { NavigationState, NavigationLimits, NavigationHandlers } from '../.
 
 
 export default function CrossViewer() {
-  const { availableChannels, omeData } = useZarrStore()
+  const { availableChannels, omeData, availableResolutions } = useZarrStore()
   const [loading, setLoading] = useState(false)
   const [_, setError] = useState<string | null>(null)
   const [arrayInfo, setArrayInfo] = useState<any>(null)
   const [currentArray, setCurrentArray] = useState<any>(null)
+  const [selectedResolution, setSelectedResolution] = useState('0')
   
   // Navigation state
   const [navigationState, setNavigationState] = useState<NavigationState>({
@@ -42,6 +43,12 @@ export default function CrossViewer() {
     onTimeSliceChange: (value: number) => setNavigationState(prev => ({ ...prev, timeSlice: value })),
     onChannelChange: (value: number) => setNavigationState(prev => ({ ...prev, currentChannel: value }))
   }
+
+  // Resolution change handler
+  const handleResolutionChange = useCallback((resolution: string) => {
+    setSelectedResolution(resolution)
+    // The ArrayLoader will handle the actual loading when resolution changes
+  }, [])
 
   const setupNavigationControls = useCallback((arr: any) => {
     const width = arr.shape[arr.shape.length - 1]
@@ -78,8 +85,8 @@ export default function CrossViewer() {
     
     // Update navigation limits
     setNavigationLimits({
-      maxXOffset: Math.max(0, width - 256),
-      maxYOffset: Math.max(0, height - 256),
+      maxXOffset: 0, // Keep for internal use but not displayed
+      maxYOffset: 0, // Keep for internal use but not displayed
       maxZSlice: maxZ,
       maxTimeSlice: maxTime,
       numChannels: channels
@@ -124,6 +131,12 @@ export default function CrossViewer() {
         onArrayLoaded={handleArrayLoaded}
         onError={handleError}
         onLoadingChange={setLoading}
+        externalResolution={selectedResolution}
+        onResolutionUsed={(resolution) => {
+          if (resolution !== selectedResolution) {
+            setSelectedResolution(resolution)
+          }
+        }}
       />
 
       {arrayInfo ? (
@@ -149,6 +162,9 @@ export default function CrossViewer() {
             navigationLimits={navigationLimits}
             navigationHandlers={navigationHandlers}
             channelNames={availableChannels}
+            availableResolutions={availableResolutions}
+            selectedResolution={selectedResolution}
+            onResolutionChange={handleResolutionChange}
           />
         </div>
       ) : !loading ? (
