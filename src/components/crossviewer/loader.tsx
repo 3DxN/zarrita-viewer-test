@@ -107,32 +107,6 @@ export default function ZarrLoader({ onArrayLoaded, onError, onLoadingChange }: 
               ))}
             </div>
           </div>
-
-          {/* Channel Buttons */}
-          {availableChannels.length > 0 && (
-            <div style={{ marginBottom: '10px' }}>
-              <label style={{ display: 'block', marginBottom: '5px' }}>Channel:</label>
-              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                {availableChannels.map((channel, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedChannel(index)}
-                    style={{
-                      padding: '5px 10px',
-                      backgroundColor: selectedChannel === index ? '#17a2b8' : '#f8f9fa',
-                      color: selectedChannel === index ? 'white' : 'black',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '12px'
-                    }}
-                  >
-                    {channel}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
           
           <button 
             onClick={loadArrayFromStore} 

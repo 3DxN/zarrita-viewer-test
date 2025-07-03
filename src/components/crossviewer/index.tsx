@@ -4,11 +4,13 @@ import { useState, useCallback } from 'react'
 import ArrayLoader from '../common/ArrayLoader'
 import ZarrViewer from './viewer'
 import NavigationControls from './navigator'
+import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
 import type { NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
 
 
 export default function CrossViewer() {
+  const { availableChannels } = useZarrStore()
   const [loading, setLoading] = useState(false)
   const [_, setError] = useState<string | null>(null)
   const [arrayInfo, setArrayInfo] = useState<any>(null)
@@ -135,6 +137,7 @@ export default function CrossViewer() {
             navigationState={navigationState}
             navigationLimits={navigationLimits}
             navigationHandlers={navigationHandlers}
+            channelNames={availableChannels}
           />
         </div>
       ) : (

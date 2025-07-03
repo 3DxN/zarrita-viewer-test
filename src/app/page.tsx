@@ -3,7 +3,7 @@
 import React from 'react'
 
 import CrossViewer from '../components/crossviewer'
-import CustomOmeZarrViewer from '../components/macroviewer/Viewer'
+import CustomOmeZarrViewer from '../components/macroviewer/'
 import StoreLoader from '../components/common/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext' 
 

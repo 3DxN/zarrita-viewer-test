@@ -9,9 +9,8 @@ import type { VivCompatibleData } from '../../types/viv'
 import type { MacroViewerProps } from '../../types/macroviewer'
 
 /**
- * MacroViewer using our custom data pipeline with central store and AltZarrPixelSource
- * This component waits for the central ZarrStore to load data, then creates Viv-compatible loaders
- * Now using AltZarrPixelSource for robust dtype handling - no more 1-second delay needed!
+ * MacroViewer component using custom OME-Zarr pipeline with AltZarrPixelSource
+ * Provides fast, robust visualization of OME-Zarr data using Viv's VolumeViewer
  */
 const MacroViewer: FC<MacroViewerProps> = ({
   height = 400,
@@ -24,7 +23,6 @@ const MacroViewer: FC<MacroViewerProps> = ({
 
   useEffect(() => {
     const loadVivData = async () => {
-      // Only proceed if central store is loaded and ready
       if (!hasLoadedStore || !store || !root || !omeData || !source) {
         return
       }
@@ -33,37 +31,16 @@ const MacroViewer: FC<MacroViewerProps> = ({
       setError(null)
       
       try {
-        console.log('🔍 MacroViewer: Creating Viv loader from central store...')
-        console.log('📊 Store data:', { source, hasLoadedStore, omeData })
-        
-        // Use the central store data to create Viv-compatible loaders
         const vivCompatibleData = await createVivLoader({
           source,
           name: 'MacroViewer',
           opacity: 1.0
         })
         
-        console.log('🎉 MacroViewer Viv data created successfully:', vivCompatibleData)
         setVivData(vivCompatibleData)
         
-        // Log detailed debug information about the loaders
-        if (vivCompatibleData.loader && vivCompatibleData.loader.length > 0) {
-          const firstLoader = vivCompatibleData.loader[0]
-          console.log('🔍 MacroViewer first loader dtype check:', firstLoader.dtype)
-          console.log('📊 MacroViewer first loader shape:', firstLoader.shape)
-          console.log('🏷️ MacroViewer first loader labels:', firstLoader.labels)
-          
-          // Use the lowest resolution (last in array) for performance
-          const lowestResLoader = vivCompatibleData.loader[vivCompatibleData.loader.length - 1]
-          console.log('🔽 MacroViewer using lowest resolution loader:', {
-            dtype: lowestResLoader.dtype,
-            shape: lowestResLoader.shape,
-            labels: lowestResLoader.labels
-          })
-        }
-        
       } catch (error) {
-        console.error('❌ MacroViewer: Failed to create Viv data:', error)
+        console.error('MacroViewer: Failed to load data:', error)
         setError(error instanceof Error ? error.message : 'Failed to load data')
       } finally {
         setLoading(false)
@@ -72,6 +49,37 @@ const MacroViewer: FC<MacroViewerProps> = ({
 
     loadVivData()
   }, [hasLoadedStore, store, root, omeData, source])
+
+  // Calculate better contrast limits based on data type
+  const getContrastLimits = () => {
+    if (!vivData?.metadata.channels[0]) return [0, 65535]
+    
+    const channel = vivData.metadata.channels[0]
+    if (channel.window) {
+      return channel.window
+    }
+    
+    // Auto-adjust based on dtype of the loader
+    const loaderToUse = vivData.loader[vivData.loader.length - 1]
+    switch (loaderToUse.dtype) {
+      case 'Uint8':
+        return [0, 255]
+      case 'Uint16':
+        return [0, 4095] // Much lower than max 65535 for better visibility
+      case 'Float32':
+        return [0.0, 1.0]
+      default:
+        return [0, 1000]
+    }
+  }
+
+  const getChannelColor = () => {
+    const channel = vivData?.metadata.channels[0]
+    if (channel?.color) {
+      return channel.color
+    }
+    return [0, 255, 0] // Bright green for good visibility
+  }
 
   // Handle loading states
   if (storeLoading || loading) {
@@ -121,21 +129,16 @@ const MacroViewer: FC<MacroViewerProps> = ({
 
   // Use the lowest resolution loader for VolumeViewer (better performance)
   const loaderToUse = vivData.loader[vivData.loader.length - 1]
-  
-  console.log('🎬 MacroViewer: Rendering VolumeViewer with:', {
-    loaderDtype: loaderToUse.dtype,
-    loaderShape: loaderToUse.shape,
-    metadata: vivData.metadata
-  })
+  const contrastLimits = getContrastLimits()
+  const channelColor = getChannelColor()
 
   return (
     <div style={{ height, width, position: 'relative', backgroundColor: '#000' }}>
-      {/* Viv VolumeViewer */}
       <div style={{ marginTop: '40px', height: height - 40, width }}>
         <VolumeViewer
           loader={[loaderToUse]}
-          contrastLimits={[vivData.metadata.channels[0]?.window || [0, 65535]]}
-          colors={[vivData.metadata.channels[0]?.color || [255, 255, 255]]}
+          contrastLimits={[contrastLimits]}
+          colors={[channelColor]}
           channelsVisible={[true]}
           selections={[{ c: 0, t: 0, z: 0 }]}
           height={height - 40}

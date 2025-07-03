@@ -47,6 +47,7 @@ export interface NavigationControlsProps {
   navigationState: NavigationState
   navigationLimits: NavigationLimits
   navigationHandlers: NavigationHandlers
+  channelNames?: string[]
 }
 
 // NavigationSlider component props

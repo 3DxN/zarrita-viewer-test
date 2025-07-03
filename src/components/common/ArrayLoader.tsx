@@ -81,64 +81,30 @@ export default function ArrayLoader({ onArrayLoaded, onError, onLoadingChange }:
   }
 
   return (
-    <div style={{ marginBottom: '15px' }}>
-      {/* Resolution Selection */}
-      <div style={{ marginBottom: '15px' }}>
-        <div style={{ flex: 1 }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Resolution:
-          </label>
-          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-            {availableResolutions.map((resolution) => (
-              <button
-                key={resolution}
-                onClick={() => handleResolutionChange(resolution)}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: selectedResolution === resolution ? '#007bff' : '#f8f9fa',
-                  color: selectedResolution === resolution ? 'white' : 'black',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: selectedResolution === resolution ? 'bold' : 'normal'
-                }}
-              >
-                {resolution}
-              </button>
-            ))}
-          </div>
-        </div>
+    <div style={{ marginBottom: '15px', flex: 1 }}>
+      <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
+        Resolution:
+      </label>
+      <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+        {availableResolutions.map((resolution) => (
+          <button
+            key={resolution}
+            onClick={() => handleResolutionChange(resolution)}
+            style={{
+              padding: '6px 12px',
+              backgroundColor: selectedResolution === resolution ? '#007bff' : '#f8f9fa',
+              color: selectedResolution === resolution ? 'white' : 'black',
+              border: '1px solid #dee2e6',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: selectedResolution === resolution ? 'bold' : 'normal'
+            }}
+          >
+            {resolution}
+          </button>
+        ))}
       </div>
-
-      {/* Channel Selection */}
-      {availableChannels.length > 0 && (
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ display: 'block', marginBottom: '5px', fontWeight: 'bold' }}>
-            Channel:
-          </label>
-          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-            {availableChannels.map((channel, index) => (
-              <button
-                key={index}
-                onClick={() => handleChannelChange(index)}
-                style={{
-                  padding: '6px 12px',
-                  backgroundColor: selectedChannel === index ? '#17a2b8' : '#f8f9fa',
-                  color: selectedChannel === index ? 'white' : 'black',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  fontWeight: selectedChannel === index ? 'bold' : 'normal'
-                }}
-              >
-                {channel}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   )
 }

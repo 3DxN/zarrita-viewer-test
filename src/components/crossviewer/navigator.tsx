@@ -7,11 +7,20 @@ export default function NavigationControls({
   arrayInfo,
   navigationState,
   navigationLimits,
-  navigationHandlers
+  navigationHandlers,
+  channelNames
 }: NavigationControlsProps) {
   const { xOffset, yOffset, zSlice, timeSlice, currentChannel } = navigationState
   const { maxXOffset, maxYOffset, maxZSlice, maxTimeSlice, numChannels } = navigationLimits
   const { onXOffsetChange, onYOffsetChange, onZSliceChange, onTimeSliceChange, onChannelChange } = navigationHandlers
+
+  // Function to get channel display name
+  const getChannelName = (index: number) => {
+    if (channelNames && channelNames[index]) {
+      return channelNames[index]
+    }
+    return `Ch ${index}`
+  }
 
   return (
     <div style={{ 
@@ -40,7 +49,7 @@ export default function NavigationControls({
                 fontSize: '12px'
               }}
             >
-              Ch {i}
+              {getChannelName(i)}
             </button>
           ))}
         </div>
