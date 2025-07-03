@@ -4,9 +4,9 @@ import React from 'react'
 
 import CrossViewer from '../components/crossviewer'
 import MacroViewer from '../components/macroviewer'
+import CustomOmeZarrViewer from '../components/featureviewer/CustomOmeZarrViewer'
 import StoreLoader from '../components/common/StoreLoader'
-import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
-// import FeatureViewer from '../components/featureviewer' 
+import { ZarrStoreProvider } from '../contexts/ZarrStoreContext' 
 
 export default function Home() {
   const initialSource = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0026/3.66.9-6.141020_15-41-29.00.ome.zarr/'
@@ -33,8 +33,8 @@ export default function Home() {
         
         {/* Right column: Feature viewer (main viewer) */}
         <div>
-          <h2>Feature Viewer</h2>
-          <p>Coming Soon...</p>
+          <h2>Custom OME-Zarr Viewer</h2>
+          <CustomOmeZarrViewer height={600} width={500} />
         </div>
 
       </div>

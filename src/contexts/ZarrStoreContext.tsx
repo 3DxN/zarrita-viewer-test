@@ -6,6 +6,7 @@ import * as zarrita from 'zarrita'
 import type OMEAttrs from '../types/ome'
 import { ZarrStoreSuggestionType, type ZarrStoreSuggestedPath,
   type ZarrStoreContextType, type ZarrStoreState, type ZarrStoreProviderProps } from '../types/store'
+import * as omeUtils from '../utils/ome-utils'
 
 const ZarrStoreContext = createContext<ZarrStoreContextType | null>(null)
 
@@ -51,27 +52,20 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         throw new Error("This appears to be an array, not a group. OME-Zarr requires group structure.")
       }
 
-      console.log(grp, grp.attrs)
+      console.log('📊 Group loaded:', grp)
+      console.log('📋 Attributes:', grp.attrs)
 
-      let omeMetadata: OMEAttrs | null = null
+      // Use utility functions to determine the data type
+      const attrs = (grp.attrs?.ome ?? grp.attrs) as OMEAttrs
       
-      if (grp.attrs.ome) {
-        omeMetadata = grp.attrs.ome
-      } else if (grp.attrs.multiscales) {
-        // If multiscales exist, we can treat this as OME-Zarr even without explicit OME attrs
-        omeMetadata = grp.attrs
-      } else {
-        throw new Error("OME metadata not found in the group.")
-      }
-            
-      // Check if this is a plate
-      if (omeMetadata.plate) {
-        console.log('Detected OME-Zarr plate structure')
+      // Check if this is a plate using utility function
+      if (omeUtils.isOmePlate(attrs)) {
+        console.log('🧪 Detected OME-Zarr plate structure')
         setState(prev => ({
           ...prev,
           store,
           root: grp,
-          omeData: omeMetadata,
+          omeData: attrs,
           availableResolutions: [],
           availableChannels: [],
           isLoading: false,
@@ -85,14 +79,14 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         return
       }
 
-      // Check if this is a well with multiple images
-      if (omeMetadata.well) {
-        console.log('Detected OME-Zarr well structure')
+      // Check if this is a well using utility function
+      if (omeUtils.isOmeWell(attrs)) {
+        console.log('🔬 Detected OME-Zarr well structure')
         setState(prev => ({
           ...prev,
           store,
           root: grp,
-          omeData: omeMetadata,
+          omeData: attrs,
           availableResolutions: [],
           availableChannels: [],
           isLoading: false,
@@ -106,46 +100,48 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         return
       }
       
-      // Check if multiscales exist
-      const multiscales = omeMetadata.multiscales?.[0]
-      
-      if (!multiscales) {
-        console.log('No multiscale found in OME metadata, suggesting subdirectories')
-        throw new Error("No multiscale metadata found.")
+      // Check if this has multiscales using utility function
+      if (omeUtils.isOmeMultiscales(attrs)) {
+        console.log('📈 Detected OME-Zarr multiscales structure')
+        
+        // Extract available resolutions from multiscales
+        const multiscales = attrs.multiscales![0]
+        const availableResolutions = multiscales.datasets.map(dataset => dataset.path)
+        
+        // Extract available channels (if present in OMERO metadata)
+        let availableChannels: string[] = []
+        if (attrs.omero?.channels) {
+          availableChannels = attrs.omero.channels.map((ch, idx) => 
+            ch.label || `Channel ${idx}`
+          )
+        }
+        
+        console.log('✅ Store loaded successfully:', {
+          resolutions: availableResolutions,
+          channels: availableChannels,
+          axes: multiscales.axes?.map(axis => axis.name)
+        })
+        
+        setState(prev => ({
+          ...prev,
+          store,
+          root: grp,
+          omeData: attrs,
+          availableResolutions,
+          availableChannels,
+          isLoading: false,
+          error: null,
+          infoMessage: null,
+          source: url,
+          hasLoadedStore: true,
+          suggestedPaths: [],
+          suggestionType: ZarrStoreSuggestionType.GENERIC
+        }))
+        return
       }
-      
-      // Extract available resolutions
-      const availableResolutions = multiscales.datasets.map(dataset => dataset.path)
-      
-      // Extract available channels (if present)
-      let availableChannels: string[] = []
-      if (omeMetadata.images?.[0]?.pixels?.channels) {
-        availableChannels = omeMetadata.images[0].pixels.channels.map((ch: any, idx: number) => 
-          ch.label || `Channel ${idx}`
-        )
-      }
-      
-      console.log('Store loaded successfully:', {
-        resolutions: availableResolutions,
-        channels: availableChannels,
-        axes: multiscales.axes?.map(axis => axis.name)
-      })
-      
-      setState(prev => ({
-        ...prev,
-        store,
-        root: grp,
-        omeData: omeMetadata,
-        availableResolutions,
-        availableChannels,
-        isLoading: false,
-        error: null,
-        infoMessage: null,
-        source: url,
-        hasLoadedStore: true,
-        suggestedPaths: [],
-        suggestionType: ZarrStoreSuggestionType.GENERIC
-      }))
+
+      // If none of the above match, this is not a supported OME-Zarr structure
+      throw new Error("No supported OME-Zarr structure found in metadata")
       
     } catch (error) {
       console.error('Error loading Zarr store:', error)
