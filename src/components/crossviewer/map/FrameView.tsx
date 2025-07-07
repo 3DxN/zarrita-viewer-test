@@ -22,12 +22,11 @@ export function createFrameOverlayLayer(
   } = {}
 ): PolygonLayer {
   const {
-    fillColor = [255, 0, 0, 200] as [number, number, number, number], // Bright red fill
+    fillColor = [0, 0, 0, 0] as [number, number, number, number], // Transparent fill for hollow frame
     lineColor = [255, 255, 255, 255] as [number, number, number, number], // White border
-    lineWidth = 10,
-    filled = true,
+    lineWidth = 3,
+    filled = false, // Hollow frame
     stroked = true,
-    includeTestPolygon = true
   } = options;
 
   const [centerX, centerY] = frameCenter;
@@ -44,25 +43,10 @@ export function createFrameOverlayLayer(
     [centerX - halfWidth, centerY - halfHeight] // Close the polygon
   ];
 
-  // Create a simple test polygon that should be visible
-  const testPolygon = [
-    [0, 0],
-    [200, 0],
-    [200, 200],
-    [0, 200],
-    [0, 0]
-  ];
-
   const data = [{ contour: framePolygon }];
-  if (includeTestPolygon) {
-    data.push({ contour: testPolygon });
-  }
 
   console.log('Frame polygon coordinates:', framePolygon);
   console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
-  if (includeTestPolygon) {
-    console.log('Test polygon coordinates:', testPolygon);
-  }
 
   // Use Viv's layer ID pattern: -#${viewport.id}#
   const layerId = `frame-overlay-#${viewportId}#`;
@@ -70,15 +54,17 @@ export function createFrameOverlayLayer(
   const layer = new PolygonLayer({
     id: layerId,
     data,
-    getPolygon: d => d.contour,
-    getFillColor: () => fillColor,
-    getLineColor: () => lineColor,
+    getPolygon: (d: any) => d.contour,
+    getLineColor: lineColor,
+    getFillColor: fillColor,
     getLineWidth: lineWidth,
     lineWidthUnits: 'pixels',
+    lineWidthScale: 0.5,
+    lineWidthMinPixels: 1,
+    lineWidthMaxPixels: 100,
     filled,
     stroked,
     pickable: false, // Make sure it doesn't capture mouse events
-    parameters: { depthTest: false }, // Ensure it renders on top
     coordinateSystem: 0, // Use default coordinate system
   });
 

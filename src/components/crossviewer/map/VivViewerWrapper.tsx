@@ -209,12 +209,11 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     if (!currentArray) return null;
 
     return createFrameOverlayLayer(frameCenter, frameSize, FRAME_VIEW_ID, {
-      fillColor: [255, 0, 0, 200] as [number, number, number, number], // Bright red fill
+      fillColor: [0, 0, 0, 0] as [number, number, number, number], // Bright red fill
       lineColor: [255, 255, 255, 255] as [number, number, number, number], // White border
       lineWidth: 10,
-      filled: true,
+      filled: false,
       stroked: true,
-      includeTestPolygon: true // Include test polygon for debugging
     });
   }, [currentArray, frameCenter, frameSize]);
 
@@ -280,7 +279,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       width: containerDimensions.width
     })
     
-    return [detailView, overviewView, frameView]
+    return [detailView, frameView, overviewView]
   }, [vivLoaders, containerDimensions])
 
   // Generate view states following Viv's pattern
