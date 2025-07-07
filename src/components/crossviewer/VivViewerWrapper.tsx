@@ -7,10 +7,9 @@ import {
   OVERVIEW_VIEW_ID,
   DETAIL_VIEW_ID
 } from '@hms-dbmi/viv'
-import { PolygonLayer } from '@deck.gl/layers'
 import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
-import { FrameView, FRAME_VIEW_ID } from './FrameView'
+import { FrameView, FRAME_VIEW_ID, createFrameOverlayLayer } from './FrameView'
 import type { NavigationState } from '../../types/crossviewer'
 
 export { FRAME_VIEW_ID } from './FrameView'
@@ -209,52 +208,14 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const frameOverlayLayer = useMemo(() => {
     if (!currentArray) return null;
 
-    // Create a simple test polygon that should be visible
-    const testPolygon = [
-      [0, 0],
-      [200, 0],
-      [200, 200],
-      [0, 200],
-      [0, 0]
-    ];
-
-    const [centerX, centerY] = frameCenter;
-    const [width, height] = frameSize;
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
-    // Create a hollow rectangle polygon (frame)
-    const framePolygon = [
-      [centerX - halfWidth, centerY - halfHeight],
-      [centerX + halfWidth, centerY - halfHeight],
-      [centerX + halfWidth, centerY + halfHeight],
-      [centerX - halfWidth, centerY + halfHeight],
-      [centerX - halfWidth, centerY - halfHeight] // Close the polygon
-    ];
-
-    console.log('Frame polygon coordinates:', framePolygon);
-    console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
-    console.log('Test polygon coordinates:', testPolygon);
-
-    const layer = new PolygonLayer({
-      id: 'frame-overlay',
-      data: [
-        { contour: framePolygon },
-        { contour: testPolygon }
-      ],
-      getPolygon: d => d.contour,
-      getFillColor: [255, 0, 0, 200], // Bright red fill
-      getLineColor: [255, 255, 255, 255], // White border
-      getLineWidth: 10,
-      lineWidthUnits: 'pixels',
+    return createFrameOverlayLayer(frameCenter, frameSize, FRAME_VIEW_ID, {
+      fillColor: [255, 0, 0, 200] as [number, number, number, number], // Bright red fill
+      lineColor: [255, 255, 255, 255] as [number, number, number, number], // White border
+      lineWidth: 10,
       filled: true,
       stroked: true,
-      pickable: false, // Make sure it doesn't capture mouse events
-      parameters: { depthTest: false }, // Ensure it renders on top
-      coordinateSystem: 0, // Use default coordinate system
-    })
-    console.log(`Layer:`, layer) // Debug log
-    return layer;
+      includeTestPolygon: true // Include test polygon for debugging
+    });
   }, [currentArray, frameCenter, frameSize]);
 
   const handleOverviewClick = useCallback((info: any) => {
