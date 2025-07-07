@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   VivViewer,
-  VivView,
   OverviewView,
   DetailView,
   getDefaultInitialViewState,
@@ -9,46 +8,12 @@ import {
   DETAIL_VIEW_ID
 } from '@hms-dbmi/viv'
 import { PolygonLayer } from '@deck.gl/layers'
-import type { Layer } from '@deck.gl/core'
 import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
+import { FrameView, FRAME_VIEW_ID } from './FrameView'
 import type { NavigationState } from '../../types/crossviewer'
 
-export const FRAME_VIEW_ID = 'frame';
-
-/**
- * Custom view that renders the base image layer plus a polygon frame overlay.
- * Follows the same pattern as DetailView but adds a frame overlay layer.
- */
-class FrameView extends VivView {
-  constructor({ id, x = 0, y = 0, height, width }: any) {
-    super({ id, x, y, height, width });
-  }
-
-  getLayers({ props, viewStates }: any): Layer[] {
-    // Only return the frame overlay layer - no base image layer
-    if (props.frameOverlayLayer) {
-      console.log('Adding frame overlay layer to FrameView:', props.frameOverlayLayer);
-      return [props.frameOverlayLayer];
-    }
-    
-    return [];
-  }
-
-  filterViewState({ viewState, currentViewState }: any) {
-    // FrameView should follow the DetailView's view state
-    if (viewState.id === DETAIL_VIEW_ID) {
-      return viewState;
-    }
-    if (viewState.id === OVERVIEW_VIEW_ID) {
-      const { target } = viewState;
-      if (target) {
-        return { ...currentViewState, target };
-      }
-    }
-    return super.filterViewState({ viewState, currentViewState });
-  }
-}
+export { FRAME_VIEW_ID } from './FrameView'
 
 type VivWrapperProps = {
   currentArray: any
@@ -284,7 +249,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       lineWidthUnits: 'pixels',
       filled: true,
       stroked: true,
-      pickable: false,
+      pickable: false, // Make sure it doesn't capture mouse events
       parameters: { depthTest: false }, // Ensure it renders on top
       coordinateSystem: 0, // Use default coordinate system
     })
@@ -295,8 +260,8 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const handleOverviewClick = useCallback((info: any) => {
     console.log('Click info:', info) // Debug log
     
-    // Check if this is a click on the overview viewport
-    if (info.coordinate) {
+    // Only handle clicks on the overview viewport
+    if (info.viewport && info.viewport.id === OVERVIEW_VIEW_ID && info.coordinate) {
       const [x, y] = info.coordinate
       console.log('Moving frame to:', x, y) // Debug log
       setFrameCenter([x, y])
@@ -328,70 +293,71 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     backgroundColor: [0, 0, 0]
   }), [containerDimensions])
 
-  // Generate view instances
-  const overviewViewInstance = useMemo(() => {
-    if (vivLoaders.length === 0) return null
-    return new OverviewView({ 
-      id: OVERVIEW_VIEW_ID,
-      loader: vivLoaders, // Pass the vivLoaders array like viewer.tsx does
-      detailHeight: containerDimensions.height,
-      detailWidth: containerDimensions.width
-    })
-  }, [vivLoaders, containerDimensions])
-
-  const detailViewInstance = useMemo(() => {
-    if (vivLoaders.length === 0) return null
-    return new DetailView({ 
+  // Generate view instances following Viv's pattern
+  const views = useMemo(() => {
+    if (vivLoaders.length === 0) return []
+    
+    // Create views array similar to PictureInPictureViewer
+    const detailView = new DetailView({ 
       id: DETAIL_VIEW_ID,
       height: containerDimensions.height,
       width: containerDimensions.width
     })
-  }, [vivLoaders, containerDimensions])
-
-  const frameViewInstance = useMemo(() => {
-    if (vivLoaders.length === 0) return null
-    return new FrameView({ 
+    
+    const overviewView = new OverviewView({ 
+      id: OVERVIEW_VIEW_ID,
+      loader: vivLoaders,
+      detailHeight: containerDimensions.height,
+      detailWidth: containerDimensions.width
+    })
+    
+    const frameView = new FrameView({ 
       id: FRAME_VIEW_ID,
       x: 0,
       y: 0,
       height: containerDimensions.height,
       width: containerDimensions.width
     })
+    
+    return [detailView, overviewView, frameView]
   }, [vivLoaders, containerDimensions])
 
-  // Generate view states
+  // Generate view states following Viv's pattern
   const viewStates = useMemo(() => {
-    if (vivLoaders.length === 0) return []
+    if (vivLoaders.length === 0 || views.length === 0) return []
     
-    // Use the vivLoaders array like viewer.tsx does
+    // Create view states array matching views order
     const overviewState = getDefaultInitialViewState(vivLoaders, overview, 0.5)
     const detailState = detailViewState || getDefaultInitialViewState(vivLoaders, containerDimensions, 0)
     
     return [
       { ...detailState, id: DETAIL_VIEW_ID },
       { ...overviewState, id: OVERVIEW_VIEW_ID },
-      { ...detailState, id: FRAME_VIEW_ID }
+      { ...detailState, id: FRAME_VIEW_ID } // Frame follows detail view state
     ]
-  }, [vivLoaders, overview, containerDimensions, detailViewState])
+  }, [vivLoaders, views, overview, containerDimensions, detailViewState])
 
-  // Generate layer props - each view needs the same loader array
+  // Generate layer props following Viv's pattern
   const layerProps = useMemo(() => {
-    if (vivLoaders.length === 0) return []
+    if (vivLoaders.length === 0 || views.length === 0) return []
     
     const baseProps = {
-      loader: vivLoaders, // Pass the AltZarrPixelSource array directly like viewer.tsx does
+      loader: vivLoaders,
       selections: [selection],
       colors: colorAndContrast.colors,
       contrastLimits: colorAndContrast.contrastLimits,
       channelsVisible: [true]
     }
     
-    return [
-      baseProps, // Detail
-      baseProps, // Overview  
-      { ...baseProps, frameOverlayLayer } // Frame (with overlay)
-    ]
-  }, [vivLoaders, selection, colorAndContrast, frameOverlayLayer])
+    // Return layer props for each view in the same order as views array
+    return views.map((view) => {
+      if (view.id === FRAME_VIEW_ID) {
+        // Frame view gets the overlay layer
+        return { ...baseProps, frameOverlayLayer }
+      }
+      return baseProps
+    })
+  }, [vivLoaders, views, selection, colorAndContrast, frameOverlayLayer])
 
   if (loading) {
     return (
@@ -415,7 +381,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     )
   }
 
-  if (!currentArray || !arrayInfo || vivLoaders.length === 0 || !overviewViewInstance || !detailViewInstance || !frameViewInstance) {
+  if (!currentArray || !arrayInfo || vivLoaders.length === 0 || views.length === 0) {
     return (
       <div 
         ref={containerRef}
@@ -446,33 +412,17 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         height: '100%',
         minHeight: '400px',
         position: 'relative',
-        overflow: 'hidden',
-        // Ensure this container captures and constrains events
-        isolation: 'isolate',
-        // Add transform to create a new stacking context
-        transform: 'translateZ(0)',
-        // Contain layout and style to prevent leakage
-        contain: 'layout style'
-      }}
-      onMouseLeave={(e) => {
-        // Prevent event bubbling when mouse leaves the viewer area
-        e.stopPropagation()
-      }}
-      onMouseEnter={(e) => {
-        // Ensure focus is captured when entering the viewer
-        e.currentTarget.focus()
+        overflow: 'hidden'
       }}
       tabIndex={0} // Make the container focusable
     >
       <VivViewer
-        views={[detailViewInstance, overviewViewInstance, frameViewInstance]}
+        views={views}
         layerProps={layerProps}
         viewStates={viewStates}
         onViewStateChange={handleViewStateChange}
         deckProps={{
-          // Set overall background to black
           style: { backgroundColor: 'black' },
-          // Enable clicking
           controller: true,
           pickingRadius: 5,
           onClick: handleOverviewClick
