@@ -22,11 +22,15 @@ body {
   /* Ensure the container can flex properly */
   display: flex;
   flex-direction: column;
+  /* Black background for the entire viewer container */
+  background-color: #000000;
 }
 
 .viv-viewer-container canvas {
   /* Ensure canvas events are contained within the viewer */
   pointer-events: auto !important;
+  /* Black background for canvases */
+  background-color: #000000 !important;
 }
 
 /* Prevent deck.gl from capturing events outside the container */
@@ -36,4 +40,6 @@ body {
   left: 0 !important;
   width: 100% !important;
   height: 100% !important;
+  /* Black background for deck.gl canvas */
+  background-color: #000000 !important;
 }

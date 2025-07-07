@@ -1,22 +1,70 @@
-'use client'
-
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { PictureInPictureViewer, OVERVIEW_VIEW_ID, DETAIL_VIEW_ID, VivView } from '@hms-dbmi/viv'
-// CHANGE: Import ScatterplotLayer instead of PathLayer
-import { PolygonLayer } from '@deck.gl/layers' 
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import {
+  VivViewer,
+  VivView,
+  OverviewView,
+  DetailView,
+  getDefaultInitialViewState,
+  OVERVIEW_VIEW_ID,
+  DETAIL_VIEW_ID
+} from '@hms-dbmi/viv'
+import { PolygonLayer } from '@deck.gl/layers'
+import type { Layer } from '@deck.gl/core'
 import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
+import type { NavigationState } from '../../types/crossviewer'
 
-import type { NavigationState, ZarrViewerProps } from '../../types/crossviewer'
+export const FRAME_VIEW_ID = 'frame';
 
-export default function ZarrViewer({
+/**
+ * Custom view that renders the base image layer plus a polygon frame overlay.
+ * Follows the same pattern as DetailView but adds a frame overlay layer.
+ */
+class FrameView extends VivView {
+  constructor({ id, x = 0, y = 0, height, width }: any) {
+    super({ id, x, y, height, width });
+  }
+
+  getLayers({ props, viewStates }: any): Layer[] {
+    // Only return the frame overlay layer - no base image layer
+    if (props.frameOverlayLayer) {
+      console.log('Adding frame overlay layer to FrameView:', props.frameOverlayLayer);
+      return [props.frameOverlayLayer];
+    }
+    
+    return [];
+  }
+
+  filterViewState({ viewState, currentViewState }: any) {
+    // FrameView should follow the DetailView's view state
+    if (viewState.id === DETAIL_VIEW_ID) {
+      return viewState;
+    }
+    if (viewState.id === OVERVIEW_VIEW_ID) {
+      const { target } = viewState;
+      if (target) {
+        return { ...currentViewState, target };
+      }
+    }
+    return super.filterViewState({ viewState, currentViewState });
+  }
+}
+
+type VivWrapperProps = {
+  currentArray: any
+  arrayInfo: any
+  navigationState: NavigationState
+  loading: boolean
+  onError: (error: string) => void
+}
+
+export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   currentArray,
   arrayInfo,
   navigationState,
   loading,
   onError
-}: ZarrViewerProps) {
-  // ... (all your existing state and useEffect hooks remain the same) ...
+}) => {
   const { omeData } = useZarrStore()
   const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
@@ -113,12 +161,13 @@ export default function ZarrViewer({
       // Set frame center to image center
       setFrameCenter([width / 2, height / 2])
       
-      // Set frame size to be proportional to image size
-      const frameWidth = Math.min(width / 4, 400)
-      const frameHeight = Math.min(height / 4, 400)
+      // Set frame size to be proportional to image size - make it bigger for visibility
+      const frameWidth = Math.min(width / 2, 800)
+      const frameHeight = Math.min(height / 2, 800)
       setFrameSize([frameWidth, frameHeight])
     }
   }, [createVivLoaders, currentArray])
+
   const selection = useMemo(() => {
     if (!currentArray) return {}
 
@@ -191,11 +240,18 @@ export default function ZarrViewer({
     }
   }, [currentArray, navigationState.currentChannel, omeData])
 
-  // --- START OF FIX ---
-
-  // Create a layer for the selection frame using ScatterplotLayer
+  // Create a layer for the selection frame using PolygonLayer
   const frameOverlayLayer = useMemo(() => {
-    if (!currentArray) return [];
+    if (!currentArray) return null;
+
+    // Create a simple test polygon that should be visible
+    const testPolygon = [
+      [0, 0],
+      [200, 0],
+      [200, 200],
+      [0, 200],
+      [0, 0]
+    ];
 
     const [centerX, centerY] = frameCenter;
     const [width, height] = frameSize;
@@ -211,26 +267,31 @@ export default function ZarrViewer({
       [centerX - halfWidth, centerY - halfHeight] // Close the polygon
     ];
 
+    console.log('Frame polygon coordinates:', framePolygon);
+    console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
+    console.log('Test polygon coordinates:', testPolygon);
+
     const layer = new PolygonLayer({
       id: 'frame-overlay',
-      data: [{ contour: framePolygon }],
+      data: [
+        { contour: framePolygon },
+        { contour: testPolygon }
+      ],
       getPolygon: d => d.contour,
-      getFillColor: [0, 0, 0, 0], // Transparent fill
+      getFillColor: [255, 0, 0, 200], // Bright red fill
       getLineColor: [255, 255, 255, 255], // White border
-      getLineWidth: 100,
+      getLineWidth: 10,
       lineWidthUnits: 'pixels',
-      filled: false,
+      filled: true,
       stroked: true,
       pickable: false,
       parameters: { depthTest: false }, // Ensure it renders on top
+      coordinateSystem: 0, // Use default coordinate system
     })
     console.log(`Layer:`, layer) // Debug log
     return layer;
   }, [currentArray, frameCenter, frameSize]);
 
-  // --- END OF FIX ---
-
-  // ... (handleOverviewClick and handleViewStateChange remain the same) ...
   const handleOverviewClick = useCallback((info: any) => {
     console.log('Click info:', info) // Debug log
     
@@ -258,6 +319,80 @@ export default function ZarrViewer({
       }
     }
   }, [])
+
+  // Overview configuration
+  const overview = useMemo(() => ({
+    height: Math.min(120, Math.floor(containerDimensions.height * 0.2)),
+    width: Math.min(120, Math.floor(containerDimensions.width * 0.2)),
+    zoom: -6,
+    backgroundColor: [0, 0, 0]
+  }), [containerDimensions])
+
+  // Generate view instances
+  const overviewViewInstance = useMemo(() => {
+    if (vivLoaders.length === 0) return null
+    return new OverviewView({ 
+      id: OVERVIEW_VIEW_ID,
+      loader: vivLoaders, // Pass the vivLoaders array like viewer.tsx does
+      detailHeight: containerDimensions.height,
+      detailWidth: containerDimensions.width
+    })
+  }, [vivLoaders, containerDimensions])
+
+  const detailViewInstance = useMemo(() => {
+    if (vivLoaders.length === 0) return null
+    return new DetailView({ 
+      id: DETAIL_VIEW_ID,
+      height: containerDimensions.height,
+      width: containerDimensions.width
+    })
+  }, [vivLoaders, containerDimensions])
+
+  const frameViewInstance = useMemo(() => {
+    if (vivLoaders.length === 0) return null
+    return new FrameView({ 
+      id: FRAME_VIEW_ID,
+      x: 0,
+      y: 0,
+      height: containerDimensions.height,
+      width: containerDimensions.width
+    })
+  }, [vivLoaders, containerDimensions])
+
+  // Generate view states
+  const viewStates = useMemo(() => {
+    if (vivLoaders.length === 0) return []
+    
+    // Use the vivLoaders array like viewer.tsx does
+    const overviewState = getDefaultInitialViewState(vivLoaders, overview, 0.5)
+    const detailState = detailViewState || getDefaultInitialViewState(vivLoaders, containerDimensions, 0)
+    
+    return [
+      { ...detailState, id: DETAIL_VIEW_ID },
+      { ...overviewState, id: OVERVIEW_VIEW_ID },
+      { ...detailState, id: FRAME_VIEW_ID }
+    ]
+  }, [vivLoaders, overview, containerDimensions, detailViewState])
+
+  // Generate layer props - each view needs the same loader array
+  const layerProps = useMemo(() => {
+    if (vivLoaders.length === 0) return []
+    
+    const baseProps = {
+      loader: vivLoaders, // Pass the AltZarrPixelSource array directly like viewer.tsx does
+      selections: [selection],
+      colors: colorAndContrast.colors,
+      contrastLimits: colorAndContrast.contrastLimits,
+      channelsVisible: [true]
+    }
+    
+    return [
+      baseProps, // Detail
+      baseProps, // Overview  
+      { ...baseProps, frameOverlayLayer } // Frame (with overlay)
+    ]
+  }, [vivLoaders, selection, colorAndContrast, frameOverlayLayer])
+
   if (loading) {
     return (
       <div 
@@ -280,7 +415,7 @@ export default function ZarrViewer({
     )
   }
 
-  if (!currentArray || !arrayInfo || vivLoaders.length === 0) {
+  if (!currentArray || !arrayInfo || vivLoaders.length === 0 || !overviewViewInstance || !detailViewInstance || !frameViewInstance) {
     return (
       <div 
         ref={containerRef}
@@ -301,6 +436,7 @@ export default function ZarrViewer({
       </div>
     )
   }
+
   return (
     <div 
       ref={containerRef}
@@ -328,22 +464,10 @@ export default function ZarrViewer({
       }}
       tabIndex={0} // Make the container focusable
     >
-      <PictureInPictureViewer
-        loader={vivLoaders}
-        selections={[selection]}
-        height={containerDimensions.height}
-        width={containerDimensions.width}
-        overview={{
-          height: Math.min(120, Math.floor(containerDimensions.height * 0.2)), // Reduced from 150px and 25% to 120px and 20%
-          width: Math.min(120, Math.floor(containerDimensions.width * 0.2)), // Reduced from 150px and 25% to 120px and 20%
-          zoom: -6,
-          // Set black background for overview
-          backgroundColor: [0, 0, 0]
-        }}
-        overviewOn={true}
-        contrastLimits={colorAndContrast.contrastLimits}
-        colors={colorAndContrast.colors}
-        channelsVisible={[true]}
+      <VivViewer
+        views={[detailViewInstance, overviewViewInstance, frameViewInstance]}
+        layerProps={layerProps}
+        viewStates={viewStates}
         onViewStateChange={handleViewStateChange}
         deckProps={{
           // Set overall background to black

@@ -3,9 +3,8 @@
 import React from 'react'
 
 import CrossViewer from '../components/crossviewer'
-import CustomOmeZarrViewer from '../components/macroviewer/'
 import StoreLoader from '../components/common/StoreLoader'
-import { ZarrStoreProvider } from '../contexts/ZarrStoreContext' 
+import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
 
 export default function Home() {
   const initialSource = 'https://uk1s3.embassy.ebi.ac.uk/idr/zarr/v0.5/idr0026/3.66.9-6.141020_15-41-29.00.ome.zarr/'
@@ -13,14 +12,9 @@ export default function Home() {
   return (  
     <ZarrStoreProvider initialSource={initialSource}>
       <StoreLoader/>
-      
-      <div className="container" style={{ display: 'grid', gridTemplateColumns: '50% 50%', gap: '20px', marginTop: '20px', height: '100vh' }}>
-        <div>
+       <div className="container" style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px', height: '100vh' }}>
+        <div style={{ flex: 1 }}>
           <CrossViewer />
-        </div>
-        
-        <div>
-          <CustomOmeZarrViewer height={500} width={500} />
         </div>
       </div>
     </ZarrStoreProvider>

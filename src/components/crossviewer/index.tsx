@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import ArrayLoader from '../common/ArrayLoader'
-import ZarrViewer from './viewer'
+import { VivViewerWrapper } from './VivViewerWrapper'
 import NavigationControls from './navigator'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
@@ -148,7 +148,7 @@ export default function CrossViewer() {
             display: 'flex',
             flexDirection: 'column'
           }}>
-            <ZarrViewer
+            <VivViewerWrapper
               currentArray={currentArray}
               arrayInfo={arrayInfo}
               navigationState={navigationState}
@@ -178,7 +178,7 @@ export default function CrossViewer() {
           Load a Zarr array to begin exploring with map-like navigation
         </div>
       ) : (
-        <ZarrViewer
+        <VivViewerWrapper
           currentArray={null}
           arrayInfo={null}
           navigationState={navigationState}
