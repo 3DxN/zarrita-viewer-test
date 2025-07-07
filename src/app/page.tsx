@@ -3,7 +3,7 @@
 import React from 'react'
 
 import CrossViewer from '../components/crossviewer'
-import StoreLoader from '../components/common/StoreLoader'
+import StoreLoader from '../components/loader/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
 
 export default function Home() {

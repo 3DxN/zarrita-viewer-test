@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { NavigationControlsProps } from '../../types/crossviewer'
+import type { NavigationControlsProps } from '../../../types/crossviewer'
 import Slider from './Slider'
 
 export default function NavigationControls({

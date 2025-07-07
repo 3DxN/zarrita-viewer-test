@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import ArrayLoader from '../common/ArrayLoader'
-import { VivViewerWrapper } from './VivViewerWrapper'
-import NavigationControls from './navigator'
+import ArrayLoader from '../loader/ArrayLoader'
+import { VivViewerWrapper } from './map/VivViewerWrapper'
+import NavigationControls from './nav/navigator'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
 import type { NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'

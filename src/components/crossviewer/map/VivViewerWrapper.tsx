@@ -7,10 +7,10 @@ import {
   OVERVIEW_VIEW_ID,
   DETAIL_VIEW_ID
 } from '@hms-dbmi/viv'
-import { AltZarrPixelSource } from '../../ext/AltZarrPixelSource'
-import { useZarrStore } from '../../contexts/ZarrStoreContext'
+import { AltZarrPixelSource } from '../../../ext/AltZarrPixelSource'
+import { useZarrStore } from '../../../contexts/ZarrStoreContext'
 import { FrameView, FRAME_VIEW_ID, createFrameOverlayLayer } from './FrameView'
-import type { NavigationState } from '../../types/crossviewer'
+import type { NavigationState } from '../../../types/crossviewer'
 
 export { FRAME_VIEW_ID } from './FrameView'
 

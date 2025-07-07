@@ -1,6 +1,6 @@
 'use client'
 
-import { SliderProps } from '../../types/crossviewer'
+import { SliderProps } from '../../../types/crossviewer'
 
 export default function Slider({
   label,
