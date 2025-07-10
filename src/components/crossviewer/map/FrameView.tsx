@@ -5,28 +5,45 @@ import type { Layer } from '@deck.gl/core'
 
 export const FRAME_VIEW_ID = 'frame';
 
+export type DragMode = 'none' | 'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'resize-n' | 'resize-s' | 'resize-e' | 'resize-w';
+
+export interface FrameInteractionState {
+  isDragging: boolean;
+  dragMode: DragMode;
+  startPos: [number, number];
+  startFrameCenter: [number, number];
+  startFrameSize: [number, number];
+}
+
 /**
- * Create a polygon frame overlay layer
+ * Create interactive polygon frame overlay layers with handles
  */
-export function createFrameOverlayLayer(
+export function createFrameOverlayLayers(
   frameCenter: [number, number],
   frameSize: [number, number],
-  viewportId: string, // Add viewport ID parameter
+  viewportId: string,
   options: {
     fillColor?: [number, number, number, number],
     lineColor?: [number, number, number, number],
     lineWidth?: number,
     filled?: boolean,
     stroked?: boolean,
-    includeTestPolygon?: boolean
+    showHandles?: boolean,
+    handleSize?: number,
+    hoveredHandle?: string | null,
+    onInteraction?: (event: any, info: any) => void
   } = {}
-): PolygonLayer {
+): PolygonLayer[] {
   const {
     fillColor = [0, 0, 0, 0] as [number, number, number, number], // Transparent fill for hollow frame
     lineColor = [255, 255, 255, 255] as [number, number, number, number], // White border
     lineWidth = 3,
     filled = false, // Hollow frame
     stroked = true,
+    showHandles = true,
+    handleSize = 8,
+    hoveredHandle = null,
+    onInteraction
   } = options;
 
   const [centerX, centerY] = frameCenter;
@@ -34,7 +51,9 @@ export function createFrameOverlayLayer(
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
-  // Create a hollow rectangle polygon (frame)
+  const layers: PolygonLayer[] = [];
+
+  // Create the main frame polygon (frame outline)
   const framePolygon = [
     [centerX - halfWidth, centerY - halfHeight],
     [centerX + halfWidth, centerY - halfHeight],
@@ -43,33 +62,237 @@ export function createFrameOverlayLayer(
     [centerX - halfWidth, centerY - halfHeight] // Close the polygon
   ];
 
-  const data = [{ contour: framePolygon }];
+  const frameData = [{ contour: framePolygon, type: 'frame' }];
 
-  console.log('Frame polygon coordinates:', framePolygon);
-  console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
-
-  // Use Viv's layer ID pattern: -#${viewport.id}#
-  const layerId = `frame-overlay-#${viewportId}#`;
-
-  const layer = new PolygonLayer({
-    id: layerId,
-    data,
+  // Main frame border layer - NOT pickable so events pass through to detail view
+  const frameLayerId = `frame-outline-#${viewportId}#`;
+  const frameLayer = new PolygonLayer({
+    id: frameLayerId,
+    data: frameData,
     getPolygon: (d: any) => d.contour,
     getLineColor: lineColor,
-    getFillColor: fillColor,
+    getFillColor: [0, 0, 0, 0], // Always transparent
     getLineWidth: lineWidth,
     lineWidthUnits: 'pixels',
     lineWidthScale: 0.5,
     lineWidthMinPixels: 1,
     lineWidthMaxPixels: 100,
-    filled,
-    stroked,
-    pickable: false, // Make sure it doesn't capture mouse events
-    coordinateSystem: 0, // Use default coordinate system
+    filled: false, // No fill to avoid interfering with events
+    stroked: true,
+    pickable: false, // NOT pickable - events pass through to detail view
+    coordinateSystem: 0
   });
 
-  console.log(`Layer with viewport ID:`, layerId, layer); // Debug log
-  return layer;
+  layers.push(frameLayer);
+
+  // Add a very transparent fill layer for visibility - also NOT pickable
+  const fillLayerId = `frame-fill-#${viewportId}#`;
+  const fillLayer = new PolygonLayer({
+    id: fillLayerId,
+    data: frameData,
+    getPolygon: (d: any) => d.contour,
+    getLineColor: [0, 0, 0, 0], // No border
+    getFillColor: [255, 255, 255, 15], // Very transparent white fill for visibility
+    filled: true,
+    stroked: false,
+    pickable: false, // NOT pickable - events pass through to detail view
+    coordinateSystem: 0
+  });
+
+  layers.push(fillLayer);
+
+  // Add a pickable frame area for moving the frame (separate from border/fill)
+  const moveAreaLayerId = `frame-move-area-#${viewportId}#`;
+  const moveAreaLayer = new PolygonLayer({
+    id: moveAreaLayerId,
+    data: [{ contour: framePolygon, type: 'move' }],
+    getPolygon: (d: any) => d.contour,
+    getLineColor: [0, 0, 0, 0], // Completely invisible
+    getFillColor: [0, 0, 0, 0], // Completely invisible
+    filled: true,
+    stroked: false,
+    pickable: true, // This layer is pickable for moving the frame
+    coordinateSystem: 0
+  });
+
+  layers.push(moveAreaLayer);
+
+  // Add corner and edge handles if enabled
+  if (showHandles) {
+    const handleColor = [255, 255, 255, 255] as [number, number, number, number];
+    const handleFillColor = [100, 150, 255, 200] as [number, number, number, number];
+    
+    // Corner handles
+    const corners = [
+      { pos: [centerX - halfWidth, centerY - halfHeight], type: 'resize-nw' },
+      { pos: [centerX + halfWidth, centerY - halfHeight], type: 'resize-ne' },
+      { pos: [centerX + halfWidth, centerY + halfHeight], type: 'resize-se' },
+      { pos: [centerX - halfWidth, centerY + halfHeight], type: 'resize-sw' },
+    ];
+
+    // Edge handles (midpoints)
+    const edges = [
+      { pos: [centerX, centerY - halfHeight], type: 'resize-n' },
+      { pos: [centerX + halfWidth, centerY], type: 'resize-e' },
+      { pos: [centerX, centerY + halfHeight], type: 'resize-s' },
+      { pos: [centerX - halfWidth, centerY], type: 'resize-w' },
+    ];
+
+    const allHandles = [...corners, ...edges];
+
+    allHandles.forEach((handle, index) => {
+      const [x, y] = handle.pos;
+      
+      // Check if this handle is hovered
+      const isHovered = hoveredHandle === handle.type;
+      const currentHandleSize = isHovered ? handleSize * 1.8 : handleSize;
+      const currentFillColor = isHovered 
+        ? [255, 200, 100, 255] as [number, number, number, number] // Bright orange when hovered
+        : handleFillColor;
+      
+      // Make handles larger for easier interaction
+      const handlePolygon = [
+        [x - currentHandleSize, y - currentHandleSize],
+        [x + currentHandleSize, y - currentHandleSize],
+        [x + currentHandleSize, y + currentHandleSize],
+        [x - currentHandleSize, y + currentHandleSize],
+        [x - currentHandleSize, y - currentHandleSize]
+      ];
+
+      const handleData = [{ contour: handlePolygon, type: handle.type, handleIndex: index }];
+
+      // Only handles are pickable for interaction
+      const handleLayer = new PolygonLayer({
+        id: `frame-handle-${handle.type}-#${viewportId}#`,
+        data: handleData,
+        getPolygon: (d: any) => d.contour,
+        getLineColor: handleColor,
+        getFillColor: currentFillColor,
+        getLineWidth: isHovered ? 4 : 3,
+        lineWidthUnits: 'pixels',
+        filled: true,
+        stroked: true,
+        pickable: true, // ONLY handles are pickable
+        coordinateSystem: 0
+      });
+
+      layers.push(handleLayer);
+    });
+  }
+
+  console.log('Frame polygon coordinates:', framePolygon);
+  console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
+  console.log(`Created ${layers.length} frame layers with viewport ID:`, viewportId);
+
+  return layers;
+}
+
+/**
+ * Helper function to determine cursor style based on drag mode
+ */
+export function getCursorForDragMode(dragMode: DragMode): string {
+  switch (dragMode) {
+    case 'move': return 'move';
+    case 'resize-nw': return 'nw-resize';
+    case 'resize-ne': return 'ne-resize';
+    case 'resize-sw': return 'sw-resize';
+    case 'resize-se': return 'se-resize';
+    case 'resize-n': return 'n-resize';
+    case 'resize-s': return 's-resize';
+    case 'resize-e': return 'e-resize';
+    case 'resize-w': return 'w-resize';
+    default: return 'default';
+  }
+}
+
+/**
+ * Helper function to calculate new frame parameters during resize.
+ * This version correctly clamps dimensions at a minimum size without "jolting".
+ */
+export function calculateFrameResize(
+  dragMode: DragMode,
+  startFrameCenter: [number, number],
+  startFrameSize: [number, number],
+  deltaX: number,
+  deltaY: number
+): { center: [number, number]; size: [number, number] } {
+  const [startCenterX, startCenterY] = startFrameCenter;
+  const [startWidth, startHeight] = startFrameSize;
+
+  // Set the minimum frame size
+  const MIN_FRAME_SIZE = 30;
+
+  // Calculate the starting edges of the box
+  let top = startCenterY - startHeight / 2;
+  let bottom = startCenterY + startHeight / 2;
+  let left = startCenterX - startWidth / 2;
+  let right = startCenterX + startWidth / 2;
+
+  // Adjust the edges based on the drag mode, with clamping
+  switch (dragMode) {
+    case "move":
+      left += deltaX;
+      right += deltaX;
+      top += deltaY;
+      bottom += deltaY;
+      break;
+
+    // --- Corner Handles ---
+    case "resize-nw":
+      left += deltaX;
+      top += deltaY;
+      // Clamp if needed
+      if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
+      if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      break;
+    case "resize-ne":
+      right += deltaX;
+      top += deltaY;
+      if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
+      if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      break;
+    case "resize-sw":
+      left += deltaX;
+      bottom += deltaY;
+      if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
+      if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      break;
+    case "resize-se":
+      right += deltaX;
+      bottom += deltaY;
+      if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
+      if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      break;
+
+    // --- Edge Handles ---
+    case "resize-n":
+      top += deltaY;
+      if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      break;
+    case "resize-s":
+      bottom += deltaY;
+      if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      break;
+    case "resize-w":
+      left += deltaX;
+      if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
+      break;
+    case "resize-e":
+      right += deltaX;
+      if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
+      break;
+  }
+
+  // Recalculate the final size and center from the clamped edges
+  const newWidth = right - left;
+  const newHeight = bottom - top;
+  const newCenterX = left + newWidth / 2;
+  const newCenterY = top + newHeight / 2;
+
+  return {
+    center: [newCenterX, newCenterY],
+    size: [newWidth, newHeight],
+  };
 }
 
 /**
@@ -89,11 +312,19 @@ export class FrameView extends VivView {
 
   /**
    * Create a DeckGL view for the frame overlay.
-   * Disable controller to prevent interaction conflicts.
+   * Disable controller navigation to allow events to pass through to detail view when no pickable objects are hit.
    */
   getDeckGlView() {
     return new OrthographicView({
-      controller: false, // Disable controller to prevent interaction conflicts
+      controller: {
+        dragPan: false,
+        dragRotate: false,
+        scrollZoom: false,
+        doubleClickZoom: false,
+        touchZoom: false,
+        touchRotate: false,
+        keyboard: false
+      }, // Disable all navigation to allow picking only - events pass through to detail view
       id: this.id,
       height: this.height,
       width: this.width,
@@ -103,15 +334,15 @@ export class FrameView extends VivView {
   }
 
   /**
-   * Return only the frame overlay layer - no base image layers.
+   * Return frame overlay layers with interactive handles.
    */
   getLayers({ props, viewStates }: any): Layer[] {
     const layers: Layer[] = [];
     
-    // Add the frame overlay layer if provided
-    if (props.frameOverlayLayer) {
-      console.log('Adding frame overlay layer to FrameView:', props.frameOverlayLayer);
-      layers.push(props.frameOverlayLayer);
+    // Add the frame overlay layers if provided
+    if (props.frameOverlayLayers && Array.isArray(props.frameOverlayLayers)) {
+      console.log('Adding frame overlay layers to FrameView:', props.frameOverlayLayers.length);
+      layers.push(...props.frameOverlayLayers);
     }
     
     return layers;

@@ -9,7 +9,15 @@ import {
 } from '@hms-dbmi/viv'
 import { AltZarrPixelSource } from '../../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../../contexts/ZarrStoreContext'
-import { FrameView, FRAME_VIEW_ID, createFrameOverlayLayer } from './FrameView'
+import { 
+  FrameView, 
+  FRAME_VIEW_ID, 
+  createFrameOverlayLayers,
+  DragMode,
+  FrameInteractionState,
+  getCursorForDragMode,
+  calculateFrameResize
+} from './FrameView'
 import type { NavigationState } from '../../../types/crossviewer'
 
 export { FRAME_VIEW_ID } from './FrameView'
@@ -35,6 +43,23 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
   const [frameSize, setFrameSize] = useState<[number, number]>([400, 400])
   const [detailViewState, setDetailViewState] = useState<any>(null)
+  const [frameInteraction, setFrameInteraction] = useState<FrameInteractionState>({
+    isDragging: false,
+    dragMode: 'none',
+    startPos: [0, 0],
+    startFrameCenter: [0, 0],
+    startFrameSize: [0, 0]
+  })
+  const [hoveredHandle, setHoveredHandle] = useState<string | null>(null)
+  const [detailViewDrag, setDetailViewDrag] = useState<{
+    isDragging: boolean,
+    startPos: [number, number],
+    startTarget: [number, number, number]
+  }>({
+    isDragging: false,
+    startPos: [0, 0],
+    startTarget: [0, 0, 0]
+  })
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Hook to observe container size changes
@@ -204,36 +229,71 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     }
   }, [currentArray, navigationState.currentChannel, omeData])
 
-  // Create a layer for the selection frame using PolygonLayer
-  const frameOverlayLayer = useMemo(() => {
-    if (!currentArray) return null;
-
-    return createFrameOverlayLayer(frameCenter, frameSize, FRAME_VIEW_ID, {
-      fillColor: [0, 0, 0, 0] as [number, number, number, number], // Bright red fill
-      lineColor: [255, 255, 255, 255] as [number, number, number, number], // White border
-      lineWidth: 10,
-      filled: false,
-      stroked: true,
-    });
-  }, [currentArray, frameCenter, frameSize]);
-
-  const handleOverviewClick = useCallback((info: any) => {
-    console.log('Click info:', info) // Debug log
+  // Handle frame interactions (handles and move area are pickable)
+  const handleFrameInteraction = useCallback((info: any) => {
+    if (!info || !info.object) return false;
     
-    // Only handle clicks on the overview viewport
-    if (info.viewport && info.viewport.id === OVERVIEW_VIEW_ID && info.coordinate) {
-      const [x, y] = info.coordinate
-      console.log('Moving frame to:', x, y) // Debug log
-      setFrameCenter([x, y])
-      
-      // Update the detail view to center on clicked position
-      const newViewState = {
-        target: [x, y, 0],
-        zoom: detailViewState?.zoom || 0
-      }
-      setDetailViewState(newViewState)
+    const layerType = info.object.type;
+    console.log('Frame interaction:', layerType, info);
+    console.log('Layer ID:', info.layer?.id);
+    console.log('Viewport ID:', info.viewport?.id);
+    
+    // Handle resize operations on handle clicks
+    if (layerType && layerType.startsWith('resize-')) {
+      console.log('Handle clicked, starting resize operation:', layerType);
+      setFrameInteraction({
+        isDragging: true,
+        dragMode: layerType as DragMode,
+        startPos: [info.coordinate[0], info.coordinate[1]],
+        startFrameCenter: [...frameCenter],
+        startFrameSize: [...frameSize]
+      });
+      return true; // Interaction handled
     }
-  }, [detailViewState])
+    
+    // Handle move operations on frame area clicks
+    if (layerType === 'move') {
+      console.log('Frame area clicked, starting move operation');
+      setFrameInteraction({
+        isDragging: true,
+        dragMode: 'move',
+        startPos: [info.coordinate[0], info.coordinate[1]],
+        startFrameCenter: [...frameCenter],
+        startFrameSize: [...frameSize]
+      });
+      return true; // Interaction handled
+    }
+    
+    return false; // No interaction handled, let detail view handle it
+  }, [frameCenter, frameSize]);
+
+  // Create interactive frame overlay layers
+  const frameOverlayLayers = useMemo(() => {
+    if (!currentArray) return [];
+
+    return createFrameOverlayLayers(frameCenter, frameSize, FRAME_VIEW_ID, {
+      fillColor: [0, 0, 0, 0] as [number, number, number, number], // Transparent - will be overridden anyway
+      lineColor: [255, 255, 255, 255] as [number, number, number, number],
+      lineWidth: 3,
+      filled: false, // Will be overridden - frame gets no fill, transparent fill layer added separately
+      stroked: true,
+      showHandles: true,
+      handleSize: 8, // Larger handles for easier interaction
+      hoveredHandle
+    });
+  }, [currentArray, frameCenter, frameSize, hoveredHandle]);
+
+  // Handle DeckGL hover events for visual feedback only
+  const handleHover = useCallback((info: any) => {
+    // Only update hover state for handles (only handles are pickable now)
+    if (!frameInteraction.isDragging && info.object && info.object.type && info.object.type.startsWith('resize-') && info.layer && info.layer.id && info.layer.id.includes('handle')) {
+      console.log('Hovering over handle:', info.object.type);
+      setHoveredHandle(info.object.type);
+    } else if (!frameInteraction.isDragging && (!info.object || !info.layer || (!info.layer.id.includes('handle') && !info.layer.id.includes('move-area')))) {
+      // Clear hover when not over any handle or move area
+      setHoveredHandle(null);
+    }
+  }, [frameInteraction.isDragging]);
 
   // Handle view state changes to keep frame synchronized
   const handleViewStateChange = useCallback(({ viewId, viewState, oldViewState }: any) => {
@@ -292,8 +352,8 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     
     return [
       { ...detailState, id: DETAIL_VIEW_ID },
-      { ...overviewState, id: OVERVIEW_VIEW_ID },
-      { ...detailState, id: FRAME_VIEW_ID } // Frame follows detail view state
+      { ...detailState, id: FRAME_VIEW_ID }, // Frame follows detail view state
+      { ...overviewState, id: OVERVIEW_VIEW_ID }
     ]
   }, [vivLoaders, views, overview, containerDimensions, detailViewState])
 
@@ -312,12 +372,12 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     // Return layer props for each view in the same order as views array
     return views.map((view) => {
       if (view.id === FRAME_VIEW_ID) {
-        // Frame view gets the overlay layer
-        return { ...baseProps, frameOverlayLayer }
+        // Frame view gets the overlay layers
+        return { ...baseProps, frameOverlayLayers }
       }
       return baseProps
     })
-  }, [vivLoaders, views, selection, colorAndContrast, frameOverlayLayer])
+  }, [vivLoaders, views, selection, colorAndContrast, frameOverlayLayers])
 
   if (loading) {
     return (
@@ -383,9 +443,178 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         onViewStateChange={handleViewStateChange}
         deckProps={{
           style: { backgroundColor: 'black' },
-          controller: true,
-          pickingRadius: 5,
-          onClick: handleOverviewClick
+          controller: {
+            dragPan: true, // Let DeckGL handle drag pan normally
+            scrollZoom: true,
+            doubleClickZoom: true,
+            touchZoom: true,
+            dragRotate: false,
+            touchRotate: false,
+            keyboard: true
+          },
+          pickingRadius: 15, // Increased picking radius for easier handle selection
+          onDragStart: (info: any) => {
+            console.log('Drag start event info:', info);
+            console.log('Viewport ID:', info.viewport?.id);
+            console.log('Layer ID:', info.layer?.id);
+            console.log('Object type:', info.object?.type);
+            
+            // Only intercept events that hit our specific pickable frame objects
+            if (info.layer && info.viewport?.id === FRAME_VIEW_ID && info.object) {
+              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
+                  (info.layer.id.includes('move-area') && info.object.type === 'move')) {
+                console.log('Frame interaction drag start, handling interaction');
+                const handled = handleFrameInteraction(info);
+                if (handled) {
+                  console.log('Frame drag start handled, stopping propagation');
+                  return true; // Stop propagation - we're handling this
+                }
+              }
+            }
+            
+            // If in frame view but didn't hit any pickable objects, start detail view panning manually
+            if (info.viewport?.id === FRAME_VIEW_ID && !info.layer && info.coordinate && detailViewState) {
+              console.log('Starting manual detail view panning from frame view');
+              setDetailViewDrag({
+                isDragging: true,
+                startPos: [info.coordinate[0], info.coordinate[1]],
+                startTarget: [detailViewState.target[0], detailViewState.target[1], detailViewState.target[2]]
+              });
+              return true; // We'll handle this manually
+            }
+            
+            // For all other cases, let default behavior handle it
+            return false;
+          },
+          onDrag: (info: any) => {
+            if (frameInteraction.isDragging && info.coordinate) {
+              console.log('Dragging frame:', frameInteraction.dragMode, info.coordinate);
+              const [currentX, currentY] = info.coordinate;
+              const [startX, startY] = frameInteraction.startPos;
+              
+              const deltaX = currentX - startX;
+              const deltaY = currentY - startY;
+              
+              const result = calculateFrameResize(
+                frameInteraction.dragMode,
+                frameInteraction.startFrameCenter,
+                frameInteraction.startFrameSize,
+                deltaX,
+                deltaY
+              );
+              
+              setFrameCenter(result.center);
+              setFrameSize(result.size);
+              return true; // Stop propagation
+            }
+            
+            // Handle manual detail view panning
+            if (detailViewDrag.isDragging && info.coordinate) {
+              console.log('Manual detail view panning:', info.coordinate);
+              const [currentX, currentY] = info.coordinate;
+              const [startX, startY] = detailViewDrag.startPos;
+              
+              const deltaX = currentX - startX;
+              const deltaY = currentY - startY;
+              
+              // Update detail view state to pan the view
+              const newTarget = [
+                detailViewDrag.startTarget[0] - deltaX,
+                detailViewDrag.startTarget[1] - deltaY,
+                detailViewDrag.startTarget[2]
+              ];
+              
+              setDetailViewState({
+                ...detailViewState,
+                target: newTarget
+              });
+              
+              return true; // Stop propagation
+            }
+            
+            return false; // Allow default behavior
+          },
+          onDragEnd: (info: any) => {
+            if (frameInteraction.isDragging) {
+              console.log('Frame drag end');
+              setFrameInteraction({
+                isDragging: false,
+                dragMode: 'none',
+                startPos: [0, 0],
+                startFrameCenter: [0, 0],
+                startFrameSize: [100, 100]
+              });
+              return true; // Stop propagation
+            }
+            
+            if (detailViewDrag.isDragging) {
+              console.log('Manual detail view panning end');
+              setDetailViewDrag({
+                isDragging: false,
+                startPos: [0, 0],
+                startTarget: [0, 0, 0]
+              });
+              return true; // Stop propagation
+            }
+            
+            return false; // Allow default behavior
+          },
+          onClick: (info: any) => {
+            console.log('Click event info:', info);
+            console.log('Viewport ID:', info.viewport?.id);
+            console.log('Layer ID:', info.layer?.id);
+            console.log('Object type:', info.object?.type);
+            
+            // Only intercept events that hit our specific pickable frame objects
+            if (info.layer && info.viewport?.id === FRAME_VIEW_ID && info.object) {
+              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
+                  (info.layer.id.includes('move-area') && info.object.type === 'move')) {
+                console.log('Frame interaction clicked, handling interaction');
+                const handled = handleFrameInteraction(info);
+                if (handled) {
+                  console.log('Frame interaction handled, stopping propagation');
+                  return true; // Stop propagation - we're handling this
+                }
+              }
+            }
+            
+            // Handle overview clicks
+            if (info.viewport && info.viewport.id === OVERVIEW_VIEW_ID && info.coordinate) {
+              console.log('Overview clicked');
+              const [x, y] = info.coordinate
+              setFrameCenter([x, y])
+              const newViewState = {
+                target: [x, y, 0],
+                zoom: detailViewState?.zoom || 0
+              }
+              setDetailViewState(newViewState)
+              return true;
+            }
+            
+            // For all other cases, let default behavior handle it
+            return false;
+          },
+          onHover: handleHover,
+          getCursor: (info: any) => {
+            if (frameInteraction.isDragging) {
+              return getCursorForDragMode(frameInteraction.dragMode);
+            }
+            if (detailViewDrag.isDragging) {
+              return 'grabbing';
+            }
+            if (hoveredHandle && hoveredHandle.startsWith('resize-')) {
+              return getCursorForDragMode(hoveredHandle as DragMode);
+            }
+            // Check if we're hovering over the frame move area
+            if (info && info.object && info.object.type === 'move' && info.layer && info.layer.id.includes('move-area')) {
+              return 'move';
+            }
+            // Show grab cursor when over frame view but not over any interactive elements
+            if (info && info.viewport?.id === FRAME_VIEW_ID && !info.layer) {
+              return 'grab';
+            }
+            return 'default';
+          }
         }}
       />
     </div>
