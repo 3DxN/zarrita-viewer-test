@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import * as zarrita from 'zarrita'
 import {
   VivViewer,
   OverviewView,
@@ -37,7 +38,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   loading,
   onError
 }) => {
-  const { omeData } = useZarrStore()
+  const { omeData, store, root, availableResolutions } = useZarrStore()
   const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
   const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
@@ -91,63 +92,131 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     return () => resizeObserver.disconnect()
   }, [updateDimensions])
 
-  // Create Viv loaders from the current array
+  // Create Viv loaders from the current array with multi-resolution support
   const createVivLoaders = useMemo(() => {
     if (!currentArray || !arrayInfo) return []
 
-    try {
-      // Determine the axis labels based on array shape
-      const shape = currentArray.shape
-      let labels: string[] = []
-      
-      if (shape.length === 5) {
-        labels = ['t', 'c', 'z', 'y', 'x']
-      } else if (shape.length === 4) {
-        // Could be CZYX or TZYX - assume CZYX for now
-        labels = ['c', 'z', 'y', 'x']
-      } else if (shape.length === 3) {
-        labels = ['z', 'y', 'x']
-      } else if (shape.length === 2) {
-        labels = ['y', 'x']
-      } else {
-        throw new Error(`Unsupported array shape: ${shape}`)
+    const loadAllResolutions = async () => {
+      try {
+        // Determine the axis labels based on array shape
+        const shape = currentArray.shape
+        let labels: string[] = []
+        
+        if (shape.length === 5) {
+          labels = ['t', 'c', 'z', 'y', 'x']
+        } else if (shape.length === 4) {
+          // Could be CZYX or TZYX - assume CZYX for now
+          labels = ['c', 'z', 'y', 'x']
+        } else if (shape.length === 3) {
+          labels = ['z', 'y', 'x']
+        } else if (shape.length === 2) {
+          labels = ['y', 'x']
+        } else {
+          throw new Error(`Unsupported array shape: ${shape}`)
+        }
+
+        const allLoaders: AltZarrPixelSource[] = []
+        
+        // Create loader for the highest resolution (current array) first
+        const primaryLoader = new AltZarrPixelSource(currentArray, {
+          labels: labels as any,
+          tileSize: 256
+        })
+        allLoaders.push(primaryLoader)
+        console.log(`✅ Created primary loader (resolution 0)`)
+        
+        // Load all additional resolutions if available
+        if (availableResolutions && availableResolutions.length > 1 && root && store) {
+          console.log(`Loading ${availableResolutions.length - 1} additional resolution levels...`)
+          
+          for (let i = 1; i < availableResolutions.length; i++) {
+            const resolutionPath = availableResolutions[i]
+            
+            try {
+              console.log(`Loading resolution level ${i}: ${resolutionPath}`)
+              const resolutionArray = await zarrita.open(root.resolve(resolutionPath), { kind: 'array' })
+              
+              const loader = new AltZarrPixelSource(resolutionArray, {
+                labels: labels as any,
+                tileSize: 256
+              })
+              
+              allLoaders.push(loader)
+              console.log(`✅ Loaded resolution ${i}: ${resolutionPath}`)
+              
+            } catch (resError) {
+              console.warn(`⚠️ Could not load resolution ${resolutionPath}:`, resError)
+              // Continue with other resolutions
+            }
+          }
+        }
+        
+        console.log(`Total loaders created: ${allLoaders.length}`)
+        setVivLoaders(allLoaders)
+        
+      } catch (error) {
+        console.error('Failed to create Viv loaders:', error)
+        onError(`Failed to create Viv loaders: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        
+        // Fallback: create just the primary loader
+        try {
+          const shape = currentArray.shape
+          let labels: string[] = []
+          
+          if (shape.length === 5) {
+            labels = ['t', 'c', 'z', 'y', 'x']
+          } else if (shape.length === 4) {
+            labels = ['c', 'z', 'y', 'x']
+          } else if (shape.length === 3) {
+            labels = ['z', 'y', 'x']
+          } else if (shape.length === 2) {
+            labels = ['y', 'x']
+          }
+
+          const fallbackLoader = new AltZarrPixelSource(currentArray, {
+            labels: labels as any,
+            tileSize: 256
+          })
+          setVivLoaders([fallbackLoader])
+        } catch (fallbackError) {
+          console.error('Even fallback loader creation failed:', fallbackError)
+          setVivLoaders([])
+        }
       }
-
-      // Create a single loader for the full resolution
-      const loader = new AltZarrPixelSource(currentArray, {
-        labels: labels as any, // Type assertion for Viv's complex label typing
-        tileSize: 256
-      })
-
-      return [loader]
-    } catch (error) {
-      console.error('Failed to create Viv loaders:', error)
-      onError(`Failed to create Viv loaders: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      return []
     }
-  }, [currentArray, arrayInfo, onError])
 
-  // Initialize frame center based on array dimensions
+    loadAllResolutions()
+    
+    // Return empty array initially - async function will populate vivLoaders
+    return []
+  }, [currentArray, arrayInfo, availableResolutions, root, store, onError])
+
+  // Initialize frame center based on array dimensions and set initial view to lowest resolution
   useEffect(() => {
-    if (currentArray && arrayInfo) {
+    if (currentArray && arrayInfo && vivLoaders.length > 0) {
       const shape = currentArray.shape
       const width = shape[shape.length - 1]
       const height = shape[shape.length - 2]
       setFrameCenter([width / 2, height / 2])
       setFrameSize([Math.min(width, height) * 0.2, Math.min(width, height) * 0.2]) // 20% of smaller dimension
       
-      // Initialize detail view state ref and controlled state
+      // Initialize detail view state to show the lowest resolution (zoomed out)
+      // Use a zoom level that shows the entire image
       const initialState = {
         target: [width / 2, height / 2, 0],
-        zoom: 0
+        zoom: Math.log2(Math.min(containerDimensions.width / width, containerDimensions.height / height)) - 1
       };
+      
+      console.log('Setting initial view state for lowest resolution:', initialState);
       detailViewStateRef.current = initialState;
       setControlledDetailViewState(initialState);
     }
-  }, [currentArray, arrayInfo])
+  }, [currentArray, arrayInfo, vivLoaders, containerDimensions])
 
+  // Update frame center and size when array changes
   useEffect(() => {
-    setVivLoaders(createVivLoaders)
+    // Run the async loader creation
+    createVivLoaders
     
     // Update frame center and size when array changes
     if (currentArray) {
