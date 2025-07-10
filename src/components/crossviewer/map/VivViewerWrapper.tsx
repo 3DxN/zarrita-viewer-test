@@ -42,7 +42,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
   const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
   const [frameSize, setFrameSize] = useState<[number, number]>([400, 400])
-  const [detailViewState, setDetailViewState] = useState<any>(null)
   const [frameInteraction, setFrameInteraction] = useState<FrameInteractionState>({
     isDragging: false,
     dragMode: 'none',
@@ -60,6 +59,13 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     startPos: [0, 0],
     startTarget: [0, 0, 0]
   })
+  
+  // Use controlled view states to prevent feedback loops
+  const [controlledDetailViewState, setControlledDetailViewState] = useState<any>(null)
+  const [isManuallyPanning, setIsManuallyPanning] = useState(false)
+  
+  // Use a ref to track the current detail view state without triggering re-renders
+  const detailViewStateRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Hook to observe container size changes
@@ -130,11 +136,13 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       setFrameCenter([width / 2, height / 2])
       setFrameSize([Math.min(width, height) * 0.2, Math.min(width, height) * 0.2]) // 20% of smaller dimension
       
-      // Initialize detail view state
-      setDetailViewState({
+      // Initialize detail view state ref and controlled state
+      const initialState = {
         target: [width / 2, height / 2, 0],
         zoom: 0
-      })
+      };
+      detailViewStateRef.current = initialState;
+      setControlledDetailViewState(initialState);
     }
   }, [currentArray, arrayInfo])
 
@@ -289,21 +297,27 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     if (!frameInteraction.isDragging && info.object && info.object.type && info.object.type.startsWith('resize-') && info.layer && info.layer.id && info.layer.id.includes('handle')) {
       console.log('Hovering over handle:', info.object.type);
       setHoveredHandle(info.object.type);
-    } else if (!frameInteraction.isDragging && (!info.object || !info.layer || (!info.layer.id.includes('handle') && !info.layer.id.includes('move-area')))) {
-      // Clear hover when not over any handle or move area
-      setHoveredHandle(null);
+    } else if (!frameInteraction.isDragging) {
+      // Clear hover when not over any handle - this includes moving from handle to frame area
+      if (hoveredHandle !== null) {
+        console.log('Clearing hovered handle');
+        setHoveredHandle(null);
+      }
     }
-  }, [frameInteraction.isDragging]);
+  }, [frameInteraction.isDragging, hoveredHandle]);
 
   // Handle view state changes to keep frame synchronized
   const handleViewStateChange = useCallback(({ viewId, viewState, oldViewState }: any) => {
     if (viewId === DETAIL_VIEW_ID) {
-      setDetailViewState(viewState)
-      if (viewState.target) {
-        setFrameCenter([viewState.target[0], viewState.target[1]])
+      // Always update the ref to track current state
+      detailViewStateRef.current = viewState
+      
+      // Only update controlled state if we're not manually panning to avoid feedback loop
+      if (!isManuallyPanning) {
+        setControlledDetailViewState(viewState);
       }
     }
-  }, [])
+  }, [isManuallyPanning])
 
   // Overview configuration
   const overview = useMemo(() => ({
@@ -348,14 +362,15 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     
     // Create view states array matching views order
     const overviewState = getDefaultInitialViewState(vivLoaders, overview, 0.5)
-    const detailState = detailViewState || getDefaultInitialViewState(vivLoaders, containerDimensions, 0)
+    // Use controlled detail view state if available, otherwise use default
+    const detailState = controlledDetailViewState || getDefaultInitialViewState(vivLoaders, containerDimensions, 0)
     
     return [
       { ...detailState, id: DETAIL_VIEW_ID },
       { ...detailState, id: FRAME_VIEW_ID }, // Frame follows detail view state
       { ...overviewState, id: OVERVIEW_VIEW_ID }
     ]
-  }, [vivLoaders, views, overview, containerDimensions, detailViewState])
+  }, [vivLoaders, views, overview, containerDimensions, controlledDetailViewState])
 
   // Generate layer props following Viv's pattern
   const layerProps = useMemo(() => {
@@ -459,8 +474,8 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             console.log('Layer ID:', info.layer?.id);
             console.log('Object type:', info.object?.type);
             
-            // Only intercept events that hit our specific pickable frame objects
-            if (info.layer && info.viewport?.id === FRAME_VIEW_ID && info.object) {
+            // Handle frame interactions first (highest priority)
+            if (info.layer && info.object) {
               if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
                   (info.layer.id.includes('move-area') && info.object.type === 'move')) {
                 console.log('Frame interaction drag start, handling interaction');
@@ -472,18 +487,24 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
               }
             }
             
-            // If in frame view but didn't hit any pickable objects, start detail view panning manually
-            if (info.viewport?.id === FRAME_VIEW_ID && !info.layer && info.coordinate && detailViewState) {
-              console.log('Starting manual detail view panning from frame view');
+            // For any drag that's not a frame interaction, start manual panning
+            // This works regardless of which viewport the event comes from
+            if (info.coordinate && detailViewStateRef.current) {
+              console.log('Starting manual detail view panning');
+              setIsManuallyPanning(true);
               setDetailViewDrag({
                 isDragging: true,
                 startPos: [info.coordinate[0], info.coordinate[1]],
-                startTarget: [detailViewState.target[0], detailViewState.target[1], detailViewState.target[2]]
+                startTarget: [
+                  detailViewStateRef.current.target[0], 
+                  detailViewStateRef.current.target[1], 
+                  detailViewStateRef.current.target[2]
+                ]
               });
               return true; // We'll handle this manually
             }
             
-            // For all other cases, let default behavior handle it
+            // Fallback - let default behavior handle it
             return false;
           },
           onDrag: (info: any) => {
@@ -517,17 +538,21 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
               const deltaX = currentX - startX;
               const deltaY = currentY - startY;
               
-              // Update detail view state to pan the view
+              // Calculate new target position
               const newTarget = [
                 detailViewDrag.startTarget[0] - deltaX,
                 detailViewDrag.startTarget[1] - deltaY,
                 detailViewDrag.startTarget[2]
               ];
               
-              setDetailViewState({
-                ...detailViewState,
+              // Update controlled state to trigger view update
+              const newViewState = {
+                ...detailViewStateRef.current,
                 target: newTarget
-              });
+              };
+              
+              detailViewStateRef.current = newViewState;
+              setControlledDetailViewState(newViewState);
               
               return true; // Stop propagation
             }
@@ -549,6 +574,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             
             if (detailViewDrag.isDragging) {
               console.log('Manual detail view panning end');
+              setIsManuallyPanning(false);
               setDetailViewDrag({
                 isDragging: false,
                 startPos: [0, 0],
@@ -583,11 +609,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
               console.log('Overview clicked');
               const [x, y] = info.coordinate
               setFrameCenter([x, y])
-              const newViewState = {
-                target: [x, y, 0],
-                zoom: detailViewState?.zoom || 0
-              }
-              setDetailViewState(newViewState)
+              // Let Viv handle the view state naturally
               return true;
             }
             
