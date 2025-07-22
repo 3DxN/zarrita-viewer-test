@@ -92,20 +92,20 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     return () => resizeObserver.disconnect()
   }, [updateDimensions])
 
-  // Create Viv loaders from the current array with multi-resolution support
-  const createVivLoaders = useMemo(() => {
-    if (!currentArray || !arrayInfo) return []
-
-    const loadAllResolutions = async () => {
+  // Remove useMemo for async loader creation, use useEffect instead
+  useEffect(() => {
+    if (!currentArray || !arrayInfo) {
+      setVivLoaders([])
+      return
+    }
+    let cancelled = false
+    async function loadAllResolutions() {
       try {
-        // Determine the axis labels based on array shape
         const shape = currentArray.shape
         let labels: string[] = []
-        
         if (shape.length === 5) {
           labels = ['t', 'c', 'z', 'y', 'x']
         } else if (shape.length === 4) {
-          // Could be CZYX or TZYX - assume CZYX for now
           labels = ['c', 'z', 'y', 'x']
         } else if (shape.length === 3) {
           labels = ['z', 'y', 'x']
@@ -114,55 +114,33 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         } else {
           throw new Error(`Unsupported array shape: ${shape}`)
         }
-
         const allLoaders: AltZarrPixelSource[] = []
-        
-        // Create loader for the highest resolution (current array) first
         const primaryLoader = new AltZarrPixelSource(currentArray, {
           labels: labels as any,
           tileSize: 256
         })
         allLoaders.push(primaryLoader)
-        console.log(`✅ Created primary loader (resolution 0)`)
-        
-        // Load all additional resolutions if available
         if (availableResolutions && availableResolutions.length > 1 && root && store) {
-          console.log(`Loading ${availableResolutions.length - 1} additional resolution levels...`)
-          
           for (let i = 1; i < availableResolutions.length; i++) {
             const resolutionPath = availableResolutions[i]
-            
             try {
-              console.log(`Loading resolution level ${i}: ${resolutionPath}`)
               const resolutionArray = await zarrita.open(root.resolve(resolutionPath), { kind: 'array' })
-              
               const loader = new AltZarrPixelSource(resolutionArray, {
                 labels: labels as any,
                 tileSize: 256
               })
-              
               allLoaders.push(loader)
-              console.log(`✅ Loaded resolution ${i}: ${resolutionPath}`)
-              
             } catch (resError) {
-              console.warn(`⚠️ Could not load resolution ${resolutionPath}:`, resError)
-              // Continue with other resolutions
+              // skip failed resolutions
             }
           }
         }
-        
-        console.log(`Total loaders created: ${allLoaders.length}`)
-        setVivLoaders(allLoaders)
-        
+        if (!cancelled) setVivLoaders(allLoaders)
       } catch (error) {
-        console.error('Failed to create Viv loaders:', error)
         onError(`Failed to create Viv loaders: ${error instanceof Error ? error.message : 'Unknown error'}`)
-        
-        // Fallback: create just the primary loader
         try {
           const shape = currentArray.shape
           let labels: string[] = []
-          
           if (shape.length === 5) {
             labels = ['t', 'c', 'z', 'y', 'x']
           } else if (shape.length === 4) {
@@ -172,23 +150,18 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           } else if (shape.length === 2) {
             labels = ['y', 'x']
           }
-
           const fallbackLoader = new AltZarrPixelSource(currentArray, {
             labels: labels as any,
             tileSize: 256
           })
-          setVivLoaders([fallbackLoader])
-        } catch (fallbackError) {
-          console.error('Even fallback loader creation failed:', fallbackError)
-          setVivLoaders([])
+          if (!cancelled) setVivLoaders([fallbackLoader])
+        } catch {
+          if (!cancelled) setVivLoaders([])
         }
       }
     }
-
     loadAllResolutions()
-    
-    // Return empty array initially - async function will populate vivLoaders
-    return []
+    return () => { cancelled = true }
   }, [currentArray, arrayInfo, availableResolutions, root, store, onError])
 
   // Initialize frame center based on array dimensions and set initial view to lowest resolution
@@ -215,9 +188,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Update frame center and size when array changes
   useEffect(() => {
-    // Run the async loader creation
-    createVivLoaders
-    
     // Update frame center and size when array changes
     if (currentArray) {
       const shape = currentArray.shape
@@ -232,7 +202,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       const frameHeight = Math.min(height / 2, 800)
       setFrameSize([frameWidth, frameHeight])
     }
-  }, [createVivLoaders, currentArray])
+  }, [currentArray])
 
   const selection = useMemo(() => {
     if (!currentArray) return {}
@@ -309,15 +279,8 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   // Handle frame interactions (handles and move area are pickable)
   const handleFrameInteraction = useCallback((info: any) => {
     if (!info || !info.object) return false;
-    
     const layerType = info.object.type;
-    console.log('Frame interaction:', layerType, info);
-    console.log('Layer ID:', info.layer?.id);
-    console.log('Viewport ID:', info.viewport?.id);
-    
-    // Handle resize operations on handle clicks
     if (layerType && layerType.startsWith('resize-')) {
-      console.log('Handle clicked, starting resize operation:', layerType);
       setFrameInteraction({
         isDragging: true,
         dragMode: layerType as DragMode,
@@ -325,12 +288,9 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         startFrameCenter: [...frameCenter],
         startFrameSize: [...frameSize]
       });
-      return true; // Interaction handled
+      return true;
     }
-    
-    // Handle move operations on frame area clicks
     if (layerType === 'move') {
-      console.log('Frame area clicked, starting move operation');
       setFrameInteraction({
         isDragging: true,
         dragMode: 'move',
@@ -338,10 +298,9 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         startFrameCenter: [...frameCenter],
         startFrameSize: [...frameSize]
       });
-      return true; // Interaction handled
+      return true;
     }
-    
-    return false; // No interaction handled, let detail view handle it
+    return false;
   }, [frameCenter, frameSize]);
 
   // Create interactive frame overlay layers
@@ -364,12 +323,10 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const handleHover = useCallback((info: any) => {
     // Only update hover state for handles (only handles are pickable now)
     if (!frameInteraction.isDragging && info.object && info.object.type && info.object.type.startsWith('resize-') && info.layer && info.layer.id && info.layer.id.includes('handle')) {
-      console.log('Hovering over handle:', info.object.type);
       setHoveredHandle(info.object.type);
     } else if (!frameInteraction.isDragging) {
       // Clear hover when not over any handle - this includes moving from handle to frame area
       if (hoveredHandle !== null) {
-        console.log('Clearing hovered handle');
         setHoveredHandle(null);
       }
     }

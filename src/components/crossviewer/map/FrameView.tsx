@@ -31,19 +31,14 @@ export function createFrameOverlayLayers(
     showHandles?: boolean,
     handleSize?: number,
     hoveredHandle?: string | null,
-    onInteraction?: (event: any, info: any) => void
   } = {}
 ): PolygonLayer[] {
   const {
-    fillColor = [0, 0, 0, 0] as [number, number, number, number], // Transparent fill for hollow frame
-    lineColor = [255, 255, 255, 255] as [number, number, number, number], // White border
+    lineColor = [255, 255, 255, 255] as [number, number, number, number],
     lineWidth = 3,
-    filled = false, // Hollow frame
-    stroked = true,
     showHandles = true,
     handleSize = 8,
     hoveredHandle = null,
-    onInteraction
   } = options;
 
   const [centerX, centerY] = frameCenter;
@@ -179,10 +174,6 @@ export function createFrameOverlayLayers(
       layers.push(handleLayer);
     });
   }
-
-  console.log('Frame polygon coordinates:', framePolygon);
-  console.log('Frame center:', frameCenter, 'Frame size:', frameSize);
-  console.log(`Created ${layers.length} frame layers with viewport ID:`, viewportId);
 
   return layers;
 }
@@ -341,7 +332,6 @@ export class FrameView extends VivView {
     
     // Add the frame overlay layers if provided
     if (props.frameOverlayLayers && Array.isArray(props.frameOverlayLayers)) {
-      console.log('Adding frame overlay layers to FrameView:', props.frameOverlayLayers.length);
       layers.push(...props.frameOverlayLayers);
     }
     
