@@ -85,33 +85,6 @@ export default function NavigationControls({
               Navigation Controls
             </h4>
             
-            {/* Resolution Selection */}
-            {availableResolutions && availableResolutions.length > 1 && (
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
-                  Resolution Level:
-                </label>
-                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                  {availableResolutions.map((resolution) => (
-                    <button
-                      key={resolution}
-                      onClick={() => onResolutionChange?.(resolution)}
-                      style={{
-                        backgroundColor: selectedResolution === resolution ? '#007bff' : '#6c757d',
-                        color: 'white',
-                        border: 'none',
-                        padding: '5px 10px',
-                        borderRadius: '3px',
-                        cursor: 'pointer',
-                        fontSize: '12px'
-                      }}
-                    >
-                      {resolution}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div style={{ marginBottom: '20px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
