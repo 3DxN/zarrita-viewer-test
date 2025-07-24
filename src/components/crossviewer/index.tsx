@@ -163,9 +163,6 @@ export default function CrossViewer() {
             navigationLimits={navigationLimits}
             navigationHandlers={navigationHandlers}
             channelNames={availableChannels}
-            availableResolutions={availableResolutions}
-            selectedResolution={selectedResolution}
-            onResolutionChange={handleResolutionChange}
           />
         </div>
       ) : !loading ? (

@@ -9,14 +9,11 @@ export default function NavigationControls({
   navigationState,
   navigationLimits,
   navigationHandlers,
-  channelNames,
-  availableResolutions,
-  selectedResolution,
-  onResolutionChange
+  channelNames
 }: NavigationControlsProps) {
-  const { xOffset, yOffset, zSlice, timeSlice, currentChannel } = navigationState
+  const { xOffset, yOffset, zSlice, timeSlice, currentChannel, contrastLimits } = navigationState
   const { maxZSlice, maxTimeSlice, numChannels } = navigationLimits
-  const { onZSliceChange, onTimeSliceChange, onChannelChange } = navigationHandlers
+  const { onZSliceChange, onTimeSliceChange, onChannelChange, onContrastLimitsChange } = navigationHandlers
   
   const [isCollapsed, setIsCollapsed] = useState(false)
 
@@ -107,6 +104,50 @@ export default function NavigationControls({
                   >
                     {getChannelName(i)}
                   </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Contrast Limit Selectors */}
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: 'bold' }}>
+                Contrast Limits:
+              </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {Array.from({ length: numChannels }, (_, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '12px', minWidth: 40 }}>{getChannelName(i)}</span>
+                    <input
+                      type="number"
+                      value={typeof contrastLimits?.[i]?.[0] === 'number' ? contrastLimits[i][0] : 0}
+                      min={0}
+                      style={{ width: 60, fontSize: '12px', padding: '2px 4px' }}
+                      onChange={e => {
+                        const val = Number(e.target.value);
+                        const newLimits = contrastLimits ? contrastLimits.map(cl => (Array.isArray(cl) && cl.length === 2 ? [cl[0], cl[1]] : [0, 0])) : [];
+                        if (!newLimits[i]) newLimits[i] = [0, 0];
+                        newLimits[i][0] = isNaN(val) ? 0 : val;
+                        onContrastLimitsChange?.(newLimits as [number, number][]);
+                      }}
+                      placeholder="Min"
+                    />
+                    <span style={{ fontSize: '12px' }}>–</span>
+                    <input
+                      type="number"
+                      value={
+                        (console.log('Contrast limits:', contrastLimits), typeof contrastLimits?.[i]?.[1] === 'number') ? contrastLimits[i][1] : 65535}
+                      min={0}
+                      style={{ width: 60, fontSize: '12px', padding: '2px 4px' }}
+                      onChange={e => {
+                        const val = Number(e.target.value);
+                        const newLimits = contrastLimits ? contrastLimits.map(cl => (Array.isArray(cl) && cl.length === 2 ? [cl[0], cl[1]] : [0, 0])) : [];
+                        if (!newLimits[i]) newLimits[i] = [0, 0];
+                        newLimits[i][1] = isNaN(val) ? 65535 : val;
+                        onContrastLimitsChange?.(newLimits as [number, number][]);
+                      }}
+                      placeholder="Max"
+                    />
+                  </div>
                 ))}
               </div>
             </div>

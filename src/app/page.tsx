@@ -7,7 +7,7 @@ import StoreLoader from '../components/loader/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
 
 export default function Home() {
-  const initialSource = 'http://localhost:600/ZarrV05WithCPmap/ThreeChannels_Resolution_Level4v05_3D.zarr'
+  const initialSource = 'http://localhost:600/ZarrV05WithCPmap/ThreeChannels_Resolution_Level4v05.zarr'
 
   return (  
     <ZarrStoreProvider initialSource={initialSource}>

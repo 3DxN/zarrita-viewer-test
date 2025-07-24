@@ -223,9 +223,17 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     return selection
   }, [currentArray, navigationState])
 
-  // Generate dynamic colors and contrast limits
+  // Generate dynamic colors and use contrast limits from navigationState if present
   const colorAndContrast = useMemo(() => {
-    if (!currentArray) return { colors: [[255, 255, 255]], contrastLimits: [[0, 4095]] }
+    if (!currentArray) {
+      console.log("Using default color and contrast limits since currentArray is not set")
+      return { 
+        colors: [[255, 255, 255]],
+        contrastLimits: [[0, 1000]]
+      }
+    }
+
+    console.log("Actually they are not using default")
 
     // Default color palette for multiple channels
     const defaultColors = [
@@ -255,26 +263,40 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     const color = defaultColors[channelIndex % defaultColors.length]
 
     // Try to get better contrast limits from OME metadata
-    let contrastMin = 0
-    let contrastMax = 4095
-    
+    let defaultContrastMin = 0
+    let defaultContrastMax = 4095
     if (omeData?.multiscales?.[0]?.datasets?.[0]?.transforms?.[0]?.scale) {
-      // Use dtype to determine better contrast limits
       const dtype = currentArray.dtype || 'uint16'
       if (dtype.includes('uint8')) {
-        contrastMax = 255
+        defaultContrastMax = 255
       } else if (dtype.includes('uint16')) {
-        contrastMax = 65535
+        defaultContrastMax = 65535
       } else if (dtype.includes('float')) {
-        contrastMax = 1.0
+        defaultContrastMax = 1.0
       }
+    }
+
+    // Use contrastLimits from navigationState if present and valid, otherwise fallback to default
+    let contrastLimits: [number, number][] = []
+    if (Array.isArray(navigationState.contrastLimits) && navigationState.contrastLimits.length > 0) {
+      console.log('Using contrast limits from navigationState:', navigationState.contrastLimits)
+      contrastLimits = navigationState.contrastLimits.map((cl: any) => {
+        if (Array.isArray(cl) && cl.length === 2 &&
+            typeof cl[0] === 'number' && typeof cl[1] === 'number') {
+          return [cl[0], cl[1]] as [number, number];
+        } else {
+          return [defaultContrastMin, defaultContrastMax] as [number, number];
+        }
+      });
+    } else {
+      contrastLimits = [[defaultContrastMin, defaultContrastMax]]
     }
 
     return {
       colors: [color],
-      contrastLimits: [[contrastMin, contrastMax]]
+      contrastLimits
     }
-  }, [currentArray, navigationState.currentChannel, omeData])
+  }, [currentArray, navigationState.currentChannel, navigationState.contrastLimits, omeData])
 
   // Handle frame interactions (handles and move area are pickable)
   const handleFrameInteraction = useCallback((info: any) => {
@@ -363,14 +385,14 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       height: containerDimensions.height,
       width: containerDimensions.width
     })
-    
+
     const overviewView = new OverviewView({ 
       id: OVERVIEW_VIEW_ID,
       loader: vivLoaders,
       detailHeight: containerDimensions.height,
       detailWidth: containerDimensions.width
     })
-    
+       
     const frameView = new FrameView({ 
       id: FRAME_VIEW_ID,
       x: 0,
@@ -400,8 +422,12 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Generate layer props following Viv's pattern
   const layerProps = useMemo(() => {
-    if (vivLoaders.length === 0 || views.length === 0) return []
-    
+    if (vivLoaders.length === 0 || views.length === 0) {
+      console.log('selection is returning empty array')
+      return []
+    }
+
+    console.log("selection:", selection);
     const baseProps = {
       loader: vivLoaders,
       selections: [selection],

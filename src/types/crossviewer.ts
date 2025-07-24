@@ -5,6 +5,7 @@ export interface NavigationState {
   zSlice: number
   timeSlice: number
   currentChannel: number
+  contrastLimits?: [number, number][]
 }
 
 // Navigation limits interface - holds maximum values and constraints
@@ -23,6 +24,7 @@ export interface NavigationHandlers {
   onZSliceChange: (value: number) => void
   onTimeSliceChange: (value: number) => void
   onChannelChange: (value: number) => void
+  onContrastLimitsChange?: (limits: [number, number][]) => void
 }
 
 // ZarrLoader component props
@@ -48,10 +50,6 @@ export interface NavigationControlsProps {
   navigationLimits: NavigationLimits
   navigationHandlers: NavigationHandlers
   channelNames?: string[]
-  // Resolution control props
-  availableResolutions?: string[]
-  selectedResolution?: string
-  onResolutionChange?: (resolution: string) => void
 }
 
 // NavigationSlider component props
