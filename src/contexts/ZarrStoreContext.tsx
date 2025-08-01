@@ -3,10 +3,14 @@
 import React, { createContext, useContext, useState, useCallback } from 'react'
 import * as zarrita from 'zarrita'
 
-import type OMEAttrs from '../types/ome'
-import { ZarrStoreSuggestionType, type ZarrStoreSuggestedPath,
-  type ZarrStoreContextType, type ZarrStoreState, type ZarrStoreProviderProps } from '../types/store'
+import { 
+  ZarrStoreSuggestionType, type ZarrStoreSuggestedPath,
+  type ZarrStoreContextType, type ZarrStoreState, type ZarrStoreProviderProps 
+} from '../types/store'
 import * as omeUtils from '../utils/ome-utils'
+import type OMEAttrs from '../types/ome'
+import type { AxisKey, IMultiscaleInfo, MultiscaleShape } from '../types/loader'
+
 
 const ZarrStoreContext = createContext<ZarrStoreContextType | null>(null)
 
@@ -18,13 +22,13 @@ export function useZarrStore() {
   return context
 }
 
+
 export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStoreProviderProps) {
   const [state, setState] = useState<ZarrStoreState>({
     store: null,
     root: null,
     omeData: null,
-    availableResolutions: [],
-    availableChannels: [],
+    msInfo: null,
     isLoading: false,
     error: null,
     infoMessage: null,
@@ -66,8 +70,6 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
           store,
           root: grp,
           omeData: attrs,
-          availableResolutions: [],
-          availableChannels: [],
           isLoading: false,
           error: null,
           infoMessage: 'Please select a well from the plate below to continue.',
@@ -87,8 +89,6 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
           store,
           root: grp,
           omeData: attrs,
-          availableResolutions: [],
-          availableChannels: [],
           isLoading: false,
           error: null,
           infoMessage: 'Please select an image from the well below to continue.',
@@ -107,6 +107,7 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         // Extract available resolutions from multiscales
         const multiscales = attrs.multiscales![0]
         const availableResolutions = multiscales.datasets.map(dataset => dataset.path)
+        const axes = multiscales.axes?.map(axis => axis.name) || []
         
         // Extract available channels (if present in OMERO metadata)
         let availableChannels: string[] = []
@@ -115,20 +116,31 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
             ch.label || `Channel ${idx}`
           )
         }
-        
-        console.log('✅ Store loaded successfully:', {
+
+        // Load the lowest resolution array to get the shape and dtype
+        const lowestResArray = await zarrita.open(
+          grp.resolve(multiscales.datasets[0].path)
+        ) as zarrita.Array<zarrita.DataType>
+
+        const shape = axes.reduce((acc, axis) => {
+          acc[axis as AxisKey] = lowestResArray.shape[axes.indexOf(axis)]
+          return acc
+        }, {} as MultiscaleShape)
+
+        // Extract multiscale Information
+        const msInfo = {
+          shape,
+          dtype: lowestResArray.dtype,
           resolutions: availableResolutions,
-          channels: availableChannels,
-          axes: multiscales.axes?.map(axis => axis.name)
-        })
-        
+          channels: availableChannels
+        } as IMultiscaleInfo;
+
         setState(prev => ({
           ...prev,
           store,
           root: grp,
           omeData: attrs,
-          availableResolutions,
-          availableChannels,
+          msInfo: msInfo,
           isLoading: false,
           error: null,
           infoMessage: null,
@@ -137,6 +149,8 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
           suggestedPaths: [],
           suggestionType: ZarrStoreSuggestionType.GENERIC
         }))
+
+        console.log('[ZarrStoreContext] ✅ Store loaded successfully:')
         return
       }
 
@@ -248,8 +262,6 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
         store: null,
         root: null,
         omeData: errorOmeData,
-        availableResolutions: [],
-        availableChannels: [],
         isLoading: false,
         error: errorMessage,
         infoMessage: null,

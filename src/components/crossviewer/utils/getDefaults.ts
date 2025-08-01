@@ -1,5 +1,7 @@
-import type { Array as ZarrArray, DataType } from 'zarrita';
+import type { DataType } from 'zarrita';
+
 import type { NavigationState, ChannelMapping } from '../../../types/crossviewer';
+import type { IMultiscaleInfo } from '../../../types/loader';
 
 
 // Helper to get default contrast limits for dtype
@@ -35,17 +37,14 @@ export function getDefaultChannelMap(availableChannels: string[]): ChannelMappin
 }
 
 // Centralized navigation state initialization
-export function getInitialNavigationState(arr: ZarrArray<DataType>, availableChannels: string[]): NavigationState {
-  const numChannels = arr.shape.length >= 4
-    ? (arr.shape.length === 5 ? arr.shape[1] : arr.shape[0])
-    : 1
-  const dtype = arr.dtype
+export function getInitialNavigationState(msInfo: IMultiscaleInfo): NavigationState {
+  const dtype = msInfo.dtype;
   return {
     xOffset: 0,
     yOffset: 0,
-    zSlice: arr.shape.length >= 3 ? Math.floor(arr.shape[arr.shape.length - 3] / 2) : 0,
+    zSlice: msInfo.shape.z ? Math.floor(msInfo.shape.z / 2) : 0,
     timeSlice: 0,
     contrastLimits: [getDefaultMaxContrastLimit(dtype), getDefaultMaxContrastLimit(dtype)],
-    channelMap: getDefaultChannelMap(availableChannels)
+    channelMap: getDefaultChannelMap(msInfo.channels)
   }
 }

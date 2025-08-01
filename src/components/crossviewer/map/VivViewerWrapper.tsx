@@ -20,25 +20,20 @@ import {
   calculateFrameResize
 } from './FrameView'
 import type { ChannelMapping, NavigationState } from '../../../types/crossviewer'
+import { IMultiscaleInfo } from '../../../types/loader'
 
 export { FRAME_VIEW_ID } from './FrameView'
 
 type VivWrapperProps = {
-  currentArray: any
-  arrayInfo: any
+  msInfo: IMultiscaleInfo
   navigationState: NavigationState
-  loading: boolean
-  onError: (error: string) => void
 }
 
 export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
-  currentArray,
-  arrayInfo,
+  msInfo,
   navigationState,
-  loading,
-  onError
 }) => {
-  const { omeData, store, root, availableResolutions } = useZarrStore()
+  const { omeData, store, root } = useZarrStore()
   const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
   const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
@@ -94,7 +89,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Remove useMemo for async loader creation, use useEffect instead
   useEffect(() => {
-    if (!currentArray || !arrayInfo) {
+    if (!currentArray || !msInfo) {
       setVivLoaders([])
       return
     }
@@ -162,11 +157,11 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     }
     loadAllResolutions()
     return () => { cancelled = true }
-  }, [currentArray, arrayInfo, availableResolutions, root, store, onError])
+  }, [currentArray, msInfo, availableResolutions, root, store, onError])
 
   // Initialize frame center based on array dimensions and set initial view to lowest resolution
   useEffect(() => {
-    if (currentArray && arrayInfo && vivLoaders.length > 0) {
+    if (currentArray && msInfo && vivLoaders.length > 0) {
       const shape = currentArray.shape
       const width = shape[shape.length - 1]
       const height = shape[shape.length - 2]
@@ -184,7 +179,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       detailViewStateRef.current = initialState;
       setControlledDetailViewState(initialState);
     }
-  }, [currentArray, arrayInfo, vivLoaders, containerDimensions])
+  }, [currentArray, msInfo, vivLoaders, containerDimensions])
 
   // Update frame center and size when array changes
   useEffect(() => {
@@ -470,7 +465,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     )
   }
 
-  if (!currentArray || !arrayInfo || vivLoaders.length === 0 || views.length === 0) {
+  if (!currentArray || !msInfo || vivLoaders.length === 0 || views.length === 0) {
     return (
       <div 
         ref={containerRef}

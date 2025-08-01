@@ -2,6 +2,7 @@ import type { FetchStore, Group } from "zarrita"
 import type { ReactNode } from "react"
 
 import type OMEAttrs from "./ome"
+import type { IMultiscaleInfo } from "./loader"
 
 
 export enum ZarrStoreSuggestionType {
@@ -21,8 +22,7 @@ export interface ZarrStoreState {
   store: FetchStore | null
   root: Group<any> | null
   omeData: OMEAttrs | null // Single OME object containing all metadata (plate, well, multiscales, etc.)
-  availableResolutions: string[]
-  availableChannels: string[]
+  msInfo: IMultiscaleInfo | null // Current array info
   isLoading: boolean
   error: string | null
   infoMessage: string | null // For non-error informational messages (like well/plate selection)

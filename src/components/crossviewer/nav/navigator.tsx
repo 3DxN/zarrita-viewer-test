@@ -7,11 +7,10 @@ import ChannelSelector from './ChannelSelector'
 import ContrastLimitsSelector from './ContrastLimitsSelector'
 
 export default function NavigationControls({
-  arrayInfo,
+  msInfo,
   navigationState,
   navigationLimits,
-  navigationHandlers,
-  channelNames
+  navigationHandlers
 }: NavigationControlsProps) {
   const { zSlice, timeSlice, channelMap, contrastLimits } = navigationState
   const { maxZSlice, maxTimeSlice, maxContrastLimit } = navigationLimits
@@ -77,7 +76,7 @@ export default function NavigationControls({
             </h4>
 
             <ChannelSelector
-              channelNames={channelNames}
+              channelNames={msInfo.channels}
               channelMap={channelMap}
               onChannelChange={onChannelChange}
             />
@@ -103,9 +102,10 @@ export default function NavigationControls({
                 fontSize: '12px',
                 fontFamily: 'monospace'
               }}>
-                <div style={{ marginTop: '5px', fontSize: '11px', color: '#6c757d' }}>
-                  Total: {arrayInfo.shape[arrayInfo.shape.length - 1]} x {arrayInfo.shape[arrayInfo.shape.length - 2]}
-                </div>
+                Disabled
+                {/* <div style={{ marginTop: '5px', fontSize: '11px', color: '#6c757d' }}>
+                  Total: {msInfo.shape[msInfo.shape.length - 1]} x {msInfo.shape[msInfo.shape.length - 2]}
+                </div> */}
               </div>
             </div>
 
@@ -117,7 +117,7 @@ export default function NavigationControls({
                 min={0}
                 max={maxZSlice}
                 onChange={onZSliceChange}
-                condition={arrayInfo.shape.length >= 3}
+                condition={Boolean(msInfo.shape.z && maxZSlice > 1)}
               />
 
               <Slider
@@ -126,42 +126,10 @@ export default function NavigationControls({
                 min={0}
                 max={maxTimeSlice}
                 onChange={onTimeSliceChange}
-                condition={arrayInfo.shape.length >= 4 && maxTimeSlice > 0}
+                condition={Boolean(msInfo.shape.t && maxTimeSlice > 1)}
               />
             </div>
           </>
-        )}
-
-        {/* Collapsed State - Show minimal controls */}
-        {isCollapsed && (
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: '10px',
-            alignItems: 'center'
-          }}>
-            
-            {/* Collapsed Z slice indicator */}
-            {arrayInfo.shape.length >= 3 && (
-              <div 
-                style={{ 
-                  width: '30px', 
-                  height: '30px', 
-                  borderRadius: '50%',
-                  backgroundColor: '#007bff',
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '10px',
-                  fontWeight: 'bold'
-                }}
-                title={`Z Slice ${zSlice}`}
-              >
-                Z{zSlice}
-              </div>
-            )}
-          </div>
         )}
       </div>
     </div>

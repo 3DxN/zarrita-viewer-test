@@ -1,3 +1,5 @@
+import { IMultiscaleInfo } from "./loader"
+
 // Navigation state interface - holds current navigation values
 export interface NavigationState {
   xOffset: number
@@ -46,11 +48,10 @@ export interface ZarrViewerProps {
 
 // NavigationControls component props
 export interface NavigationControlsProps {
-  arrayInfo: any
+  msInfo: IMultiscaleInfo
   navigationState: NavigationState
   navigationLimits: NavigationLimits
   navigationHandlers: NavigationHandlers
-  channelNames: string[]
 }
 
 // NavigationSlider component props
