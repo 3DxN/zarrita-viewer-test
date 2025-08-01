@@ -115,6 +115,8 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
           availableChannels = attrs.omero.channels.map((ch, idx) => 
             ch.label || `Channel ${idx}`
           )
+        } else {
+          alert('No channels found in OME metadata. Is your metadata valid?');
         }
 
         // Load the lowest resolution array to get the shape and dtype

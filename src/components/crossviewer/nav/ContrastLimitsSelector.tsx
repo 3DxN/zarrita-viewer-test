@@ -23,11 +23,13 @@ const ContrastLimitsSelector = ({
       <h3>Contrast Limits</h3>
       {Object.entries(channelMap).map(([role, channelIndex]) => {
         if (channelIndex === null || channelIndex === undefined) {
-          return <></>; // Skip if no channel is selected for this role
+          return null;
         }
 
         const currentLimit = contrastLimits[channelIndex] ?? 0;
         const maxLimit = maxContrastLimit
+
+        console.log('Rendering contrast limits selector for role:', role, 'with index:', channelIndex);
 
         return (
           <div key={role}>
