@@ -19,7 +19,7 @@ import {
   getCursorForDragMode,
   calculateFrameResize
 } from './FrameView'
-import type { NavigationState } from '../../../types/crossviewer'
+import type { ChannelMapping, NavigationState } from '../../../types/crossviewer'
 
 export { FRAME_VIEW_ID } from './FrameView'
 
@@ -204,65 +204,64 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     }
   }, [currentArray])
 
-  const selection = useMemo(() => {
-    if (!currentArray) return {}
+  const selections = useMemo(() => {
+    if (!currentArray || !navigationState.channelMap) return {}
 
-    const selection: Record<string, number> = {}
-    const shape = currentArray.shape
+    const channelMap = navigationState.channelMap;
 
-    if (shape.length >= 4) {
-      selection.c = navigationState.currentChannel
-    }
-    if (shape.length >= 3) {
-      selection.z = navigationState.zSlice
-    }
-    if (shape.length >= 5) {
-      selection.t = navigationState.timeSlice
-    }
+    const selections: Record<string, number>[] = [];
+    // Create multiple selections based on the number of channels selected
+    // That are not null
+    Object.entries(channelMap).reduce((acc, [_, val]) => {
+      if (val === null || val === undefined) {
+        return acc;
+      }
 
-    return selection
+      const selection: Record<string, number> = {}
+      const shape = currentArray.shape
+
+      if (shape.length >= 4) {
+        selection.c = val
+      }
+      if (shape.length >= 3) {
+        selection.z = navigationState.zSlice
+      }
+      if (shape.length >= 5) {
+        selection.t = navigationState.timeSlice
+      }
+
+      return acc.concat([selection]);
+
+    }, selections);
+
+    return selections;
+  
   }, [currentArray, navigationState])
 
   // Generate dynamic colors and use contrast limits from navigationState if present
   const colorAndContrast = useMemo(() => {
-    if (!currentArray) {
-      console.log("Using default color and contrast limits since currentArray is not set")
-      return { 
-        colors: [[255, 255, 255]],
-        contrastLimits: [[0, 1000]]
-      }
-    }
 
-    console.log("Actually they are not using default")
-
-    // Default color palette for multiple channels
+    // Default color palette for multiple channels - referenced from
+    // https://github.com/3DxN/Phenotype3DLegacy/blob/main/src/genHnE.py
     const defaultColors = [
-      [255, 0, 0],   // Red
-      [0, 255, 0],   // Green  
-      [0, 0, 255],   // Blue
-      [255, 255, 0], // Yellow
-      [255, 0, 255], // Magenta
-      [0, 255, 255], // Cyan
-      [255, 128, 0], // Orange
-      [128, 0, 255]  // Purple
+      [42.4, 68.1, 25.7], // Nucl
+      [11.8, 255, 137.2], // Cyto
     ]
 
-    // Determine number of channels
-    const shape = currentArray.shape
-    let numChannels = 1
-    if (shape.length >= 4) {
-      if (shape.length === 5) {
-        numChannels = shape[1] // TCZYX
-      } else if (shape.length === 4) {
-        numChannels = shape[0] <= 10 ? shape[0] : 1 // CZYX (assume C if small number)
+    const defaultContrastLimits = [[0, 4095]]
+
+    if (!currentArray || !navigationState.channelMap || !navigationState.contrastLimits) {
+      console.log("Using default color and contrast limits since currentArray is not set")
+      return { 
+        colors: [defaultColors[0]],
+        contrastLimits: defaultContrastLimits
       }
     }
 
-    // Get color for current channel or use first channel color if single channel
-    const channelIndex = navigationState.currentChannel || 0
-    const color = defaultColors[channelIndex % defaultColors.length]
+    // From channelMap determine the selected channels
+    const channelMap = navigationState.channelMap;
 
-    // Try to get better contrast limits from OME metadata
+    // Try to get better contrast limits from OME metadata DType
     let defaultContrastMin = 0
     let defaultContrastMax = 4095
     if (omeData?.multiscales?.[0]?.datasets?.[0]?.transforms?.[0]?.scale) {
@@ -275,6 +274,9 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         defaultContrastMax = 1.0
       }
     }
+
+    // Set max contrast limits on navigator
+    
 
     // Use contrastLimits from navigationState if present and valid, otherwise fallback to default
     let contrastLimits: [number, number][] = []
@@ -293,10 +295,10 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     }
 
     return {
-      colors: [color],
+      colors: defaultColors.filter((_, index) => index in Object.values(channelMap)),
       contrastLimits
     }
-  }, [currentArray, navigationState.currentChannel, navigationState.contrastLimits, omeData])
+  }, [currentArray, navigationState.channelMap, navigationState.contrastLimits, omeData])
 
   // Handle frame interactions (handles and move area are pickable)
   const handleFrameInteraction = useCallback((info: any) => {
@@ -427,10 +429,10 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       return []
     }
 
-    console.log("selection:", selection);
+    console.log("selection:", selections);
     const baseProps = {
       loader: vivLoaders,
-      selections: [selection],
+      selections: [selections],
       colors: colorAndContrast.colors,
       contrastLimits: colorAndContrast.contrastLimits,
       channelsVisible: [true]
@@ -444,7 +446,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       }
       return baseProps
     })
-  }, [vivLoaders, views, selection, colorAndContrast, frameOverlayLayers])
+  }, [vivLoaders, views, selections, colorAndContrast, frameOverlayLayers])
 
   if (loading) {
     return (

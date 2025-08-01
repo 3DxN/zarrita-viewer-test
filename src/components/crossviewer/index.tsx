@@ -1,113 +1,88 @@
 'use client'
 
 import { useState, useCallback } from 'react'
+import { Array, DataType } from 'zarrita'
 import ArrayLoader from '../loader/ArrayLoader'
 import { VivViewerWrapper } from './map/VivViewerWrapper'
 import NavigationControls from './nav/navigator'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
-import type { NavigationState, NavigationLimits, NavigationHandlers } from '../../types/crossviewer'
+import type { NavigationState, NavigationLimits, NavigationHandlers, ChannelMapping, ContrastLimits } from '../../types/crossviewer'
+import { getDefaultMaxContrastLimit, getInitialNavigationState } from './utils/getDefaults'
+import type { IArrayInfo } from '../../types/loader'
 
 
 export default function CrossViewer() {
-  const { availableChannels, omeData, availableResolutions } = useZarrStore()
+  const { availableChannels } = useZarrStore()
   const [loading, setLoading] = useState(false)
   const [_, setError] = useState<string | null>(null)
-  const [arrayInfo, setArrayInfo] = useState<any>(null)
-  const [currentArray, setCurrentArray] = useState<any>(null)
+  const [arrayInfo, setArrayInfo] = useState<IArrayInfo | null>(null)
+  const [currentArray, setCurrentArray] = useState<Array<DataType> | null>(null)
   const [selectedResolution, setSelectedResolution] = useState('0')
   
-  // Navigation state
-  const [navigationState, setNavigationState] = useState<NavigationState>({
-    xOffset: 0,
-    yOffset: 0,
-    zSlice: 0,
-    timeSlice: 0,
-    currentChannel: 0
-  })
-  
-  // Navigation limits
-  const [navigationLimits, setNavigationLimits] = useState<NavigationLimits>({
-    maxXOffset: 0,
-    maxYOffset: 0,
-    maxZSlice: 0,
-    maxTimeSlice: 0,
-    numChannels: 1
-  })
+  // Navigation state and limits
+  const [navigationState, setNavigationState] = useState<NavigationState | null>(null)
+  const [navigationLimits, setNavigationLimits] = useState<NavigationLimits | null>(null)
 
   // Navigation handlers
   const navigationHandlers: NavigationHandlers = {
-    onXOffsetChange: (value: number) => setNavigationState(prev => ({ ...prev, xOffset: value })),
-    onYOffsetChange: (value: number) => setNavigationState(prev => ({ ...prev, yOffset: value })),
-    onZSliceChange: (value: number) => setNavigationState(prev => ({ ...prev, zSlice: value })),
-    onTimeSliceChange: (value: number) => setNavigationState(prev => ({ ...prev, timeSlice: value })),
-    onChannelChange: (value: number) => setNavigationState(prev => ({ ...prev, currentChannel: value }))
+    onXOffsetChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, xOffset: value }) : prev),
+    onYOffsetChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, yOffset: value }) : prev),
+    onZSliceChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, zSlice: value }) : prev),
+    onTimeSliceChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, timeSlice: value }) : prev),
+    onContrastLimitsChange: (limits: ContrastLimits) => setNavigationState(
+      prev => prev ? ({ ...prev, contrastLimits: limits }) : prev
+    ),
+    onChannelChange: (role: keyof ChannelMapping, value: number | null) => setNavigationState(prev => prev ? ({
+      ...prev,
+      channelMap: {
+        ...prev.channelMap,
+        [role]: value
+      }
+    }) : prev)
   }
 
-  // Resolution change handler
-  const handleResolutionChange = useCallback((resolution: string) => {
-    setSelectedResolution(resolution)
-    // The ArrayLoader will handle the actual loading when resolution changes
-  }, [])
-
-  const setupNavigationControls = useCallback((arr: any) => {
-    const width = arr.shape[arr.shape.length - 1]
-    const height = arr.shape[arr.shape.length - 2]
-    
-    // Determine number of channels based on array shape
-    let channels = 1
-    if (arr.shape.length >= 4) {
-      if (arr.shape.length === 5) {
-        channels = arr.shape[1]
-      } else if (arr.shape.length === 4) {
-        channels = arr.shape[0] <= 10 ? arr.shape[0] : 1
-      }
-    }
-    
-    // Set Z slice range
-    let maxZ = 0
-    if (arr.shape.length >= 3) {
-      const zDim = arr.shape.length - 3
-      maxZ = Math.max(0, arr.shape[zDim] - 1)
-    }
-    
-    // Set time slice range
-    let maxTime = 0
-    if (arr.shape.length >= 4) {
-      let timeDim = 0
-      if (arr.shape.length === 5) {
-        timeDim = 0
-      } else if (arr.shape.length === 4) {
-        timeDim = 0
-      }
-      maxTime = Math.max(0, arr.shape[timeDim] - 1)
-    }
-    
-    // Update navigation limits
-    setNavigationLimits({
-      maxXOffset: 0, // Keep for internal use but not displayed
-      maxYOffset: 0, // Keep for internal use but not displayed
-      maxZSlice: maxZ,
-      maxTimeSlice: maxTime,
-      numChannels: channels
-    })
-    
-    // Reset navigation values
-    setNavigationState({
-      xOffset: 0,
-      yOffset: 0,
-      zSlice: arr.shape.length >= 3 ? Math.floor(arr.shape[arr.shape.length - 3] / 2) : 0,
-      timeSlice: 0,
-      currentChannel: 0
-    })
-  }, [])
-
-  const handleArrayLoaded = useCallback((array: any, info: any) => {
+  /**
+   * This callback is now the single source of truth for initializing
+   * all state related to a newly loaded Zarr array.
+   */
+  const handleArrayLoaded = useCallback((array: Array<DataType>, info: IArrayInfo) => {
+    // 1. Set the current array and info
     setCurrentArray(array)
     setArrayInfo(info)
-    setupNavigationControls(array)
-    setError(null)
-  }, [setupNavigationControls])
+    setError(null) // Clear any previous errors
+
+    // 2. Initialize navigation state and limits
+    if (!availableChannels) {
+      return; // Guard against missing channel names
+    }
+
+    // Get the default navigation state (z-slice, channel map, etc.)
+    const initialNavState = getInitialNavigationState(array, availableChannels);
+    
+    // Calculate navigation limits based on the array's shape and data type
+    const shape = array.shape;
+    const channels = shape.length >= 4 ? (shape.length === 5 ? shape[1] : shape[0]) : 1;
+    const maxZ = shape.length >= 3 ? Math.max(0, shape[shape.length - 3] - 1) : 0;
+    const maxTime = shape.length === 5 ? Math.max(0, shape[0] - 1) : 0; // Time is only in 5D arrays
+    const maxContrastLimit = getDefaultMaxContrastLimit(array.dtype);
+
+    setNavigationLimits({
+      maxXOffset: 0,
+      maxYOffset: 0,
+      maxZSlice: maxZ,
+      maxTimeSlice: maxTime,
+      numChannels: channels,
+      maxContrastLimit
+    });
+
+    // Set the full, initial navigation state, including default contrast limits for the first channel
+    setNavigationState({
+      ...initialNavState,
+      contrastLimits: [maxContrastLimit, maxContrastLimit] // Default contrast for the first channel
+    });
+
+  }, [availableChannels]) // This callback depends on `availableChannels` from the context
 
   const handleError = useCallback((errorMessage: string) => {
     setError(errorMessage)
@@ -134,7 +109,7 @@ export default function CrossViewer() {
         }}
       />
 
-      {arrayInfo ? (
+      {arrayInfo && navigationState && navigationLimits ? (
         <div style={{ 
           display: 'flex', 
           gap: '20px', 
@@ -165,23 +140,15 @@ export default function CrossViewer() {
             channelNames={availableChannels}
           />
         </div>
-      ) : !loading ? (
+      ) : (
         <div style={{ 
           padding: '20px',
           textAlign: 'center',
           color: '#6c757d',
           fontStyle: 'italic'
         }}>
-          Load a Zarr array to begin exploring with map-like navigation
+          {loading ? 'Loading...' : 'Load a Zarr array to begin exploring with map-like navigation'}
         </div>
-      ) : (
-        <VivViewerWrapper
-          currentArray={null}
-          arrayInfo={null}
-          navigationState={navigationState}
-          loading={loading}
-          onError={handleError}
-        />
       )}
     </div>
   )

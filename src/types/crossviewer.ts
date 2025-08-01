@@ -4,8 +4,8 @@ export interface NavigationState {
   yOffset: number
   zSlice: number
   timeSlice: number
-  currentChannel: number
-  contrastLimits?: [number, number][]
+  channelMap: ChannelMapping
+  contrastLimits: ContrastLimits;
 }
 
 // Navigation limits interface - holds maximum values and constraints
@@ -15,6 +15,7 @@ export interface NavigationLimits {
   maxZSlice: number
   maxTimeSlice: number
   numChannels: number
+  maxContrastLimit: number;
 }
 
 // Navigation handlers interface - holds all callback functions
@@ -23,8 +24,8 @@ export interface NavigationHandlers {
   onYOffsetChange: (value: number) => void
   onZSliceChange: (value: number) => void
   onTimeSliceChange: (value: number) => void
-  onChannelChange: (value: number) => void
-  onContrastLimitsChange?: (limits: [number, number][]) => void
+  onChannelChange: (role: keyof ChannelMapping, value: number | null) => void
+  onContrastLimitsChange: (limits: ContrastLimits) => void
 }
 
 // ZarrLoader component props
@@ -49,7 +50,7 @@ export interface NavigationControlsProps {
   navigationState: NavigationState
   navigationLimits: NavigationLimits
   navigationHandlers: NavigationHandlers
-  channelNames?: string[]
+  channelNames: string[]
 }
 
 // NavigationSlider component props
@@ -62,3 +63,31 @@ export interface SliderProps {
   valueDisplay?: string | ((value: number, max: number) => string)
   condition?: boolean
 }
+
+export interface ChannelMapperProps {
+  channelNames: string[];
+  channelMap: ChannelMapping;
+  onChannelChange: (role: keyof ChannelMapping, value: number | null) => void;
+}
+
+export interface ChannelMapping {
+  nucleus: number | null; // Channel index for nucleus, null if not selected
+  cytoplasm: number | null; // Channel index for cytoplasm, null if not selected
+}
+
+export interface ContrastLimitsProps {
+  /**
+   * Current contrast limit for each channel
+   */
+  contrastLimits: ContrastLimits;
+  /**
+   * Maximum contrast limit (for all channels)
+   */
+  maxContrastLimit: number;
+  /**
+   * Callback when contrast limits change
+   */
+  onContrastLimitsChange: (limits: ContrastLimits) => void;
+}
+
+export type ContrastLimits = [number | null, number | null];

@@ -12,7 +12,7 @@ export default function ArrayLoader({
   externalResolution, 
   onResolutionUsed 
 }: ArrayLoaderProps) {
-  const { store, root, availableResolutions, availableChannels } = useZarrStore()
+  const { store, root, availableResolutions } = useZarrStore()
   const [selectedResolution, setSelectedResolution] = useState('0')
   const [selectedChannel, setSelectedChannel] = useState(0)
 
@@ -58,12 +58,6 @@ export default function ArrayLoader({
   const handleResolutionChange = (resolution: string) => {
     setSelectedResolution(resolution)
     loadArrayFromStore(resolution, selectedChannel)
-  }
-
-  // Auto-load when channel is changed
-  const handleChannelChange = (channelIndex: number) => {
-    setSelectedChannel(channelIndex)
-    loadArrayFromStore(selectedResolution, channelIndex)
   }
 
   const loadArrayFromStore = async (resolution?: string, channel?: number) => {
