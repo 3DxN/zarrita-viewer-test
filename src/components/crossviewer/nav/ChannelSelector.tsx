@@ -15,6 +15,9 @@ const ChannelSelector = (props: ChannelMapperProps) => {
     let selectedIndex: number | null;
     try {
       selectedIndex = parseInt(value, 10);
+      if (isNaN(selectedIndex)) {
+        selectedIndex = null; // If parsing fails, set to null
+      }
     } catch (error) {
       selectedIndex = null;
     }

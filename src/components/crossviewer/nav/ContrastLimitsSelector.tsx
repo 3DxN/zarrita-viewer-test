@@ -32,30 +32,37 @@ const ContrastLimitsSelector = ({
         console.log('Rendering contrast limits selector for role:', role, 'with index:', channelIndex);
 
         return (
-          <div key={role}>
-            <label>Contrast limits for {role} Channel</label>
-            <input
-              type="range"
-              min={0}
-              max={maxLimit}
-              value={currentLimit}
-              onChange={(e) => {
-                try {
-                  const newLimit = parseInt(e.target.value, 10);
-                  if (isNaN(newLimit)) {
+          <div key={role} style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
+              {role}: {currentLimit}
+            </label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '12px', color: '#888', minWidth: 24 }}>0</span>
+              <input
+                type="range"
+                min={0}
+                max={maxLimit}
+                value={currentLimit}
+                onChange={(e) => {
+                  try {
+                    const newLimit = parseInt(e.target.value, 10);
+                    if (isNaN(newLimit)) {
+                      return;
+                    }
+                    onContrastLimitsChange(
+                      contrastLimits.map((limit, index) => 
+                        index === channelIndex ? newLimit : limit
+                      ) as ContrastLimits
+                    );
+                  } catch (error) {
+                    console.error('Invalid contrast limit value:', e.target.value);
                     return;
                   }
-                  onContrastLimitsChange(
-                    contrastLimits.map((limit, index) => 
-                      index === channelIndex ? newLimit : limit
-                    ) as ContrastLimits
-                  );
-                } catch (error) {
-                  console.error('Invalid contrast limit value:', e.target.value);
-                  return;
-                }
-              }}
-            />
+                }}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: '12px', color: '#888', minWidth: 32 }}>{maxLimit}</span>
+            </div>
           </div>
         );
       })}

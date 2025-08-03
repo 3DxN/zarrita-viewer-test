@@ -112,7 +112,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           }
         
           const loader = new AltZarrPixelSource(resolutionArray, {
-            labels: Object.keys(shape).map((key: string) => key === 'c' ? '_c' : key) as viv.Labels<string[]>,
+            labels: Object.keys(shape) as viv.Labels<string[]>,
             tileSize: tileSize
           })
           allLoaders.push(loader)
@@ -121,6 +121,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         }
       }
 
+      console.log('Loaded all resolutions:', allLoaders)
       setVivLoaders(allLoaders)
     }
 
@@ -136,6 +137,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
       if (!width || !height) {
         // Dims missing, return for now and come back later
+        console.log('Missing dimensions for msInfo, cannot initialize frame center');
         return
       }
 
@@ -159,37 +161,20 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   }, [msInfo, vivLoaders, containerDimensions])
 
   const selections = useMemo(() => {
-    if (!navigationState.channelMap) return {}
-
-    const channelMap = navigationState.channelMap;
-
-    const selections: Record<string, number>[] = [];
-    // Create multiple selections based on the number of channels selected
-    // That are not null
-    console.log('Generating selections from channel map:', channelMap);
-    Object.entries(channelMap).reduce((acc, [_, val]) => {
-      if (val === null || val === undefined) {
-        return acc;
-      }
-
-      const selection: Record<string, number> = {}
-      const shape = msInfo.shape
-
-      if (shape.c && shape.c > 0) {
-        selection._c = val
-      }
-      if (shape.z && shape.z >= 0) {
-        selection.z = navigationState.zSlice
-      }
-      if (shape.t && shape.t >= 0) {
-        selection.t = navigationState.timeSlice
-      }
-
-      return acc.concat([selection]);
-
-    }, selections);
-
-    return selections;
+    if (!navigationState.channelMap) {
+      console.log("No channel map available, returning empty selections")
+      return []
+    }
+    
+    const shape = msInfo.shape;
+    const selection: Record<string, number> = {};
+    if (shape.z && shape.z >= 0) {
+      selection.z = navigationState.zSlice;
+    }
+    if (shape.t && shape.t >= 0) {
+      selection.t = navigationState.timeSlice;
+    }
+    return [selection];
   
   }, [navigationState])
 
@@ -205,24 +190,26 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
     if (!navigationState.channelMap) {
       console.log("Using default color")
-      return { 
-        colors: [defaultColors[0]]
-      }
+      return [defaultColors[0]]
     }
 
     // From channelMap determine the selected channels
     // Just check the number of non-null values
     const channelMap = navigationState.channelMap;
 
-    return {
-      colors: defaultColors.slice(0, Object.values(channelMap).filter(val => val !== null && val !== undefined).length)
-    }
+    return defaultColors.slice(0, Object.values(channelMap).filter(
+      val => val !== null && val !== undefined).length
+    )
   }, [navigationState.channelMap])
 
 
   // Handle frame interactions (handles and move area are pickable)
   const handleFrameInteraction = useCallback((info: any) => {
-    if (!info || !info.object) return false;
+    if (!info || !info.object) {
+      console.log('No interaction info or object, returning false');
+      return false;
+    }
+    
     const layerType = info.object.type;
     if (layerType && layerType.startsWith('resize-')) {
       setFrameInteraction({
@@ -249,7 +236,10 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Create interactive frame overlay layers
   const frameOverlayLayers = useMemo(() => {
-    if (!msInfo) return [];
+    if (!msInfo) {
+      console.log('returning empty frame overlay layers');
+      return [];
+    }
 
     return createFrameOverlayLayers(frameCenter, frameSize, FRAME_VIEW_ID, {
       fillColor: [0, 0, 0, 0] as [number, number, number, number], // Transparent - will be overridden anyway
@@ -299,8 +289,11 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Generate view instances following Viv's pattern
   const views = useMemo(() => {
-    if (vivLoaders.length === 0) return []
-    
+    if (vivLoaders.length === 0) {
+      console.log('views is returning empty array', { vivLoaders })
+      return []
+    }
+
     // Create views array similar to PictureInPictureViewer
     const detailView = new DetailView({ 
       id: DETAIL_VIEW_ID,
@@ -328,8 +321,11 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Generate view states following Viv's pattern
   const viewStates = useMemo(() => {
-    if (vivLoaders.length === 0 || views.length === 0) return []
-    
+    if (vivLoaders.length === 0 || views.length === 0) {
+      console.log('viewStates is returning empty array', { vivLoaders, views })
+      return []
+    }
+
     // Create view states array matching views order
     const overviewState = getDefaultInitialViewState(vivLoaders, overview, 0.5)
     // Use controlled detail view state if available, otherwise use default
@@ -344,18 +340,34 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
 
   // Generate layer props following Viv's pattern
   const layerProps = useMemo(() => {
-    if (vivLoaders.length === 0 || views.length === 0) {
-      console.log('selection is returning empty array')
+    if (vivLoaders.length === 0 || views.length === 0 || !msInfo.shape.c) {
       return []
     }
 
+    const contrastLimits = Array.from({ length: msInfo.shape.c }, (_, index) => {
+      const entries = Object.entries(navigationState.channelMap)
+      for (let i = 0; i < entries.length; i++) {
+        if (entries[i][1] === index) {
+          return [0, navigationState.contrastLimits[i]]
+        }
+      }
+      return [0, 65535] // Use a sensible default instead of [0, 0]
+    });
+
+    const channelsVisible = Array.from({ length: msInfo.shape.c }, (_, index) => {
+      // Check if this channel index is in the channelMap values
+      return Object.values(navigationState.channelMap).includes(index);
+    });
+
     const baseProps = {
       loader: vivLoaders,
-      selections: [selections],
-      colors: colors.colors,
-      contrastLimits: navigationState.contrastLimits,
-      channelsVisible: [true]
+      selections,
+      colors,
+      contrastLimits,
+      channelsVisible
     }
+
+    console.log('Generating layer props:', baseProps)
     
     // Return layer props for each view in the same order as views array
     return views.map((view) => {
@@ -420,11 +432,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           },
           pickingRadius: 15, // Increased picking radius for easier handle selection
           onDragStart: (info: any) => {
-            console.log('Drag start event info:', info);
-            console.log('Viewport ID:', info.viewport?.id);
-            console.log('Layer ID:', info.layer?.id);
-            console.log('Object type:', info.object?.type);
-            
+        
             // Handle frame interactions first (highest priority)
             if (info.layer && info.object) {
               if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
@@ -460,7 +468,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           },
           onDrag: (info: any) => {
             if (frameInteraction.isDragging && info.coordinate) {
-              console.log('Dragging frame:', frameInteraction.dragMode, info.coordinate);
               const [currentX, currentY] = info.coordinate;
               const [startX, startY] = frameInteraction.startPos;
               
@@ -512,7 +519,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           },
           onDragEnd: (info: any) => {
             if (frameInteraction.isDragging) {
-              console.log('Frame drag end');
               setFrameInteraction({
                 isDragging: false,
                 dragMode: 'none',
@@ -524,7 +530,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             }
             
             if (detailViewDrag.isDragging) {
-              console.log('Manual detail view panning end');
               setIsManuallyPanning(false);
               setDetailViewDrag({
                 isDragging: false,
@@ -537,19 +542,13 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             return false; // Allow default behavior
           },
           onClick: (info: any) => {
-            console.log('Click event info:', info);
-            console.log('Viewport ID:', info.viewport?.id);
-            console.log('Layer ID:', info.layer?.id);
-            console.log('Object type:', info.object?.type);
             
             // Only intercept events that hit our specific pickable frame objects
             if (info.layer && info.viewport?.id === FRAME_VIEW_ID && info.object) {
               if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
                   (info.layer.id.includes('move-area') && info.object.type === 'move')) {
-                console.log('Frame interaction clicked, handling interaction');
                 const handled = handleFrameInteraction(info);
                 if (handled) {
-                  console.log('Frame interaction handled, stopping propagation');
                   return true; // Stop propagation - we're handling this
                 }
               }
@@ -557,7 +556,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             
             // Handle overview clicks
             if (info.viewport && info.viewport.id === OVERVIEW_VIEW_ID && info.coordinate) {
-              console.log('Overview clicked');
               const [x, y] = info.coordinate
               setFrameCenter([x, y])
               // Let Viv handle the view state naturally
