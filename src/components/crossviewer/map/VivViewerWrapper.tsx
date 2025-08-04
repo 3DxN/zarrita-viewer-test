@@ -97,23 +97,21 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         return
       }
 
-      const shape = msInfo.shape
       const allLoaders: AltZarrPixelSource[] = []
-      let tileSize: number = -1
 
       for (const resolutionPath of msInfo.resolutions) {
         try {
-          const resolutionArray = await zarrita.open(root.resolve(resolutionPath)) as zarrita.Array<typeof msInfo.dtype>
-          // Guess the tile size  
-          if (tileSize === -1) {
-            const ySize = resolutionArray.shape.at(-2)
-            const xSize = resolutionArray.shape.at(-1)
-            tileSize = 2 ** Math.floor(Math.log2(Math.min(xSize!, ySize!)));
-          }
-        
+          const resolutionArray =
+            await zarrita.open(root.resolve(resolutionPath)) as zarrita.Array<typeof msInfo.dtype>
           const loader = new AltZarrPixelSource(resolutionArray, {
-            labels: Object.keys(shape) as viv.Labels<string[]>,
-            tileSize: tileSize
+            labels: ['t', 'c', 'z', 'y', 'x'].filter(
+              key => Object.keys(msInfo.shape).includes(key)
+            ) as viv.Labels<string[]>,
+            /*
+             * TileSize represents a chunk size in pixels for each resolution level.
+             * If tilesize is incorrect it causes initial mismatches in render sizes.
+             */
+            tileSize: resolutionArray.chunks.at(-1)!
           })
           allLoaders.push(loader)
         } catch (error) {
@@ -121,7 +119,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         }
       }
 
-      console.log('Loaded all resolutions:', allLoaders)
       setVivLoaders(allLoaders)
     }
 
@@ -151,7 +148,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       // Use a zoom level that shows the entire image
       const initialState = {
         target: [width / 2, height / 2, 0],
-        zoom: Math.log2(Math.min(containerDimensions.width / width, containerDimensions.height / height)) - 1
+        zoom: -4
       };
       
       console.log('Setting initial view state for lowest resolution:', initialState);
@@ -283,7 +280,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const overview = useMemo(() => ({
     height: Math.min(120, Math.floor(containerDimensions.height * 0.2)),
     width: Math.min(120, Math.floor(containerDimensions.width * 0.2)),
-    zoom: -6,
+    zoom: -4,
     backgroundColor: [0, 0, 0]
   }), [containerDimensions])
 

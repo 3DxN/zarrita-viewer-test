@@ -29,8 +29,6 @@ const ContrastLimitsSelector = ({
         const currentLimit = contrastLimits[channelIndex] ?? 0;
         const maxLimit = maxContrastLimit
 
-        console.log('Rendering contrast limits selector for role:', role, 'with index:', channelIndex);
-
         return (
           <div key={role} style={{ marginBottom: '16px' }}>
             <label style={{ display: 'block', marginBottom: '6px', fontWeight: 'bold' }}>
