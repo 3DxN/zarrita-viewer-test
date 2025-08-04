@@ -148,7 +148,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       // Use a zoom level that shows the entire image
       const initialState = {
         target: [width / 2, height / 2, 0],
-        zoom: -4
+        zoom: -3
       };
       
       console.log('Setting initial view state for lowest resolution:', initialState);
@@ -193,10 +193,16 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     // From channelMap determine the selected channels
     // Just check the number of non-null values
     const channelMap = navigationState.channelMap;
+    const channelMapEntries = Object.entries(channelMap);
 
-    return defaultColors.slice(0, Object.values(channelMap).filter(
-      val => val !== null && val !== undefined).length
-    )
+    return Array.from({ length: msInfo.shape.c! }, (_, i) => {
+      for (let j = 0; j < channelMapEntries.length; j++) {
+        if (channelMapEntries[j][1] === i) {
+          return defaultColors[j]
+        }
+      }
+      return [0, 0, 0] // Default to black if no mapping found
+    })
   }, [navigationState.channelMap])
 
 
@@ -280,7 +286,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
   const overview = useMemo(() => ({
     height: Math.min(120, Math.floor(containerDimensions.height * 0.2)),
     width: Math.min(120, Math.floor(containerDimensions.width * 0.2)),
-    zoom: -4,
+    zoom: -3,
     backgroundColor: [0, 0, 0]
   }), [containerDimensions])
 
@@ -363,8 +369,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       contrastLimits,
       channelsVisible
     }
-
-    console.log('Generating layer props:', baseProps)
     
     // Return layer props for each view in the same order as views array
     return views.map((view) => {
@@ -432,12 +436,10 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         
             // Handle frame interactions first (highest priority)
             if (info.layer && info.object) {
-              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
-                  (info.layer.id.includes('move-area') && info.object.type === 'move')) {
-                console.log('Frame interaction drag start, handling interaction');
+              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-'))
+                || (info.layer.id.includes('move-area') && info.object.type === 'move')) {
                 const handled = handleFrameInteraction(info);
                 if (handled) {
-                  console.log('Frame drag start handled, stopping propagation');
                   return true; // Stop propagation - we're handling this
                 }
               }
@@ -446,7 +448,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             // For any drag that's not a frame interaction, start manual panning
             // This works regardless of which viewport the event comes from
             if (info.coordinate && detailViewStateRef.current) {
-              console.log('Starting manual detail view panning');
               setIsManuallyPanning(true);
               setDetailViewDrag({
                 isDragging: true,
@@ -486,7 +487,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             
             // Handle manual detail view panning
             if (detailViewDrag.isDragging && info.coordinate) {
-              console.log('Manual detail view panning:', info.coordinate);
               const [currentX, currentY] = info.coordinate;
               const [startX, startY] = detailViewDrag.startPos;
               
