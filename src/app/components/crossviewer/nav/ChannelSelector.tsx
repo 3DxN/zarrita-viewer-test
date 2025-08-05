@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChannelMapperProps, ChannelMapping } from '../../../types/crossviewer';
+import { ChannelMapperProps, ChannelMapping } from '../../../../types/crossviewer';
 
 
 const ChannelSelector = (props: ChannelMapperProps) => {

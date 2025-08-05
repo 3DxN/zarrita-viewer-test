@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 
-import type { FrameState, FrameStateContextType } from '../types/framestate';
+import type { FrameState, FrameStateContextType } from '../types/frame';
 
 
 const FrameStateContext = createContext<FrameStateContextType | undefined>(undefined);

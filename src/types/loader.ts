@@ -1,5 +1,9 @@
-import type { DataType } from "zarrita"
+/**
+ * Data loader types for zarr array metadata and multiscale information
+ */
 
+import type { DataType } from "zarrita"
+import type { AxisKey, MultiscaleShape } from "./core"
 
 export interface IMultiscaleInfo {
   /**
@@ -21,6 +25,4 @@ export interface IMultiscaleInfo {
   channels: string[]
 }
 
-export type AxisKey = 'x' | 'y' | 'z' | 't' | 'c'
-
-export type MultiscaleShape = Partial<Record<AxisKey, number>>;
+export { type AxisKey, type MultiscaleShape } from "./core"

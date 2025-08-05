@@ -7,7 +7,7 @@ import {
   calculateFrameResize,
   createFrameOverlayLayers,
   FRAME_VIEW_ID
-} from '../components/crossviewer/map/FrameView'
+} from '../app/components/crossviewer/map/FrameView'
 
 import type { PickingInfo } from 'deck.gl'
 import type { IMultiscaleInfo } from '../types/loader'

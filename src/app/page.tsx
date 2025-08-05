@@ -2,10 +2,11 @@
 
 import React from 'react'
 
-import CrossViewer from '../components/crossviewer'
-import StoreLoader from '../components/loader/StoreLoader'
+import CrossViewer from './components/crossviewer'
+import StoreLoader from './components/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
 import { FrameStateProvider } from '../contexts/FrameStateContext'
+
 
 export default function Home() {
   const initialSource = 'http://localhost:600/ThreeChannels_Resolution_Level2V05.zarr'

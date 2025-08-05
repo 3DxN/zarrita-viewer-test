@@ -9,7 +9,7 @@ import {
 } from '@hms-dbmi/viv'
 
 import { AltZarrPixelSource } from '../ext/AltZarrPixelSource'
-import { FrameView, FRAME_VIEW_ID } from '../components/crossviewer/map/FrameView'
+import { FrameView, FRAME_VIEW_ID } from '../app/components/crossviewer/map/FrameView'
 
 import type * as viv from "@vivjs/types"
 import type { Layer } from 'deck.gl'

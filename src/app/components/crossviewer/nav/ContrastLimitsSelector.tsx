@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import type { ChannelMapping, ContrastLimits, ContrastLimitsProps } from '../../../types/crossviewer';
+import type { ChannelMapping, ContrastLimits, ContrastLimitsProps } from '../../../../types/crossviewer';
 
 
 /**

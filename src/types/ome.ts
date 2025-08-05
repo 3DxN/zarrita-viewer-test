@@ -3,9 +3,7 @@
  * Based on OME-NGFF specification v0.4 and v0.5
  */
 
-export interface IStringAny {
-  [key: string]: any;
-}
+import type { IStringAny } from './core'
 
 // Core OME-Zarr types
 export interface OMEAxes extends IStringAny {

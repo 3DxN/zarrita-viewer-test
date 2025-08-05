@@ -6,11 +6,29 @@ import type { IMultiscaleInfo } from "./loader"
 
 
 export enum ZarrStoreSuggestionType {
-  PLATE, // OME Plate
-  WELL, // OME Well
-  NO_MULTISCALE, // OME metadata found, without multiscale data
-  CELLPOSE, // CellPose metadata found
-  GENERIC // NO OME metadata found - do not suggest anything
+  /**
+   * OME Plate metadata found
+   */
+  PLATE,
+  /**
+   * OME Well metadata found
+   */
+  WELL,
+  /**
+   * Generic OME metadata found, but not multiscales
+   */
+  NO_MULTISCALE,
+  /**
+   * CellPose segmentation metadata found
+   * This is a special case where we suggest CellPose-specific paths
+   * even if no OME metadata is present.
+   */
+  CELLPOSE,
+  /**
+   * No OME metadata found
+   * This is the default state when no suggestions are available.
+   */
+  GENERIC
 }
 
 export interface ZarrStoreSuggestedPath {

@@ -1,14 +1,14 @@
 import React from 'react'
 import { VivViewer } from '@hms-dbmi/viv'
 
-import { useZarrStore } from '../../../contexts/ZarrStoreContext'
-import { useFrameState } from '../../../contexts/FrameStateContext'
-import { useFrameInteraction } from '../../../hooks/useFrameInteraction'
-import useVivViewer from '../../../hooks/useVivViewer'
-import { useFrameInitialization } from '../../../hooks/useFrameInitialization'
+import { useZarrStore } from '../../../../contexts/ZarrStoreContext'
+import { useFrameState } from '../../../../contexts/FrameStateContext'
+import { useFrameInteraction } from '../../../../hooks/useFrameInteraction'
+import useVivViewer from '../../../../hooks/useVivViewer'
+import { useFrameInitialization } from '../../../../hooks/useFrameInitialization'
 
-import type { NavigationState } from '../../../types/crossviewer'
-import type { IMultiscaleInfo } from '../../../types/loader'
+import type { NavigationState } from '../../../../types/crossviewer'
+import type { IMultiscaleInfo } from '../../../../types/loader'
 
 
 const VivViewerWrapper: React.FC<{

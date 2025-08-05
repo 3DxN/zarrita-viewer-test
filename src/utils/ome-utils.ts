@@ -1,13 +1,13 @@
 import * as zarrita from 'zarrita'
-import type OMEAttrs from '../types/ome'
+
 import type { 
   OMEAxes, 
   OMEMultiscales, 
   OMEROMetadata, 
   ProcessedOMEMetadata,
-  OMECoordinateTransformation,
   OMEdataset
 } from '../types/ome'
+
 
 /**
  * Utility functions for processing OME-Zarr metadata and data
