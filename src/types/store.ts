@@ -9,6 +9,7 @@ export enum ZarrStoreSuggestionType {
   PLATE, // OME Plate
   WELL, // OME Well
   NO_MULTISCALE, // OME metadata found, without multiscale data
+  CELLPOSE, // CellPose metadata found
   GENERIC // NO OME metadata found - do not suggest anything
 }
 

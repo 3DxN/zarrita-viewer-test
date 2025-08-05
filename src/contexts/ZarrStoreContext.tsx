@@ -238,8 +238,21 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
             }
           }
         } else {
-          // Case 3: No OME metadata - fall back to generic exploration
-          console.log('No OME metadata found.')
+          // Check attrs labels
+          const attrs = opened.attrs;
+          if (attrs && attrs.labels && attrs.labels instanceof Array && attrs.labels.includes('Cellpose')) {
+            // Case 3: CellPose Data - suggest the "CellPose" subdirectory
+            console.log('CellPose data detected, suggesting the "CellPose" subdirectory')
+
+            suggestionType = ZarrStoreSuggestionType.CELLPOSE
+            suggestedPaths.push({
+              path: 'Cellpose',
+              isGroup: true,
+              hasOme: false
+            })
+          }
+          // Case 4: No OME metadata - fall back to generic exploration
+          console.log('No OME metadata found...')
           suggestionType = ZarrStoreSuggestionType.GENERIC
           // Don't suggest any paths for completely missing OME metadata
         }

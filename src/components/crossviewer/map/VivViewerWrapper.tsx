@@ -118,7 +118,6 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
           console.error(`Failed to load resolution at ${resolutionPath}:`, error)
         }
       }
-
       setVivLoaders(allLoaders)
     }
 
