@@ -1,4 +1,8 @@
-import { IMultiscaleInfo } from "./loader"
+import type { VivView } from "@hms-dbmi/viv"
+import type { Layer, View } from "deck.gl"
+import type { AltZarrPixelSource } from "../ext/AltZarrPixelSource"
+import type { IMultiscaleInfo } from "./loader"
+
 
 // Navigation state interface - holds current navigation values
 export interface NavigationState {
@@ -103,4 +107,51 @@ export interface VivDetailViewState {
   isDragging: boolean,
   startPos: [number, number],
   startTarget: [number, number, number] // [x, y, zoom]
+}
+
+export interface VivViewerState {
+  vivLoaders: AltZarrPixelSource[]
+  containerDimensions: { width: number; height: number }
+  detailViewDrag: VivDetailViewState
+  controlledDetailViewState: VivViewState | null
+  isManuallyPanning: boolean
+  detailViewStateRef: React.RefObject<VivViewState | null>
+  containerRef: React.RefObject<HTMLDivElement | null>
+}
+
+export interface VivViewerComputed {
+  selections: Record<string, number>[]
+  colors: number[][]
+  overview: {
+    height: number
+    width: number
+    zoom: number
+    backgroundColor: number[]
+  }
+  views: (VivView | View)[]
+  viewStates: VivViewState[]
+  layerProps: VivLayerProps[]
+}
+
+export interface VivLayerProps {
+  loader: AltZarrPixelSource[];
+  selections: Record<string, number>[];
+  colors: number[][];
+  contrastLimits: [number, number][];
+  channelsVisible: boolean[];
+  frameOverlayLayers?: Layer[]; // Optional for frame view
+}
+
+export interface VivViewerActions {
+  setContainerDimensions: (dimensions: { width: number; height: number }) => void
+  setDetailViewDrag: (drag: VivDetailViewState) => void
+  setControlledDetailViewState: (state: VivViewState | null) => void
+  setIsManuallyPanning: (panning: boolean) => void
+  updateDimensions: () => void
+  handleViewStateChange: ({ viewId, viewState }: {
+    viewId: string
+    viewState: VivViewState
+    oldViewState: VivViewState
+  }) => void
+  createLayerProps: (frameOverlayLayers?: Layer[]) => VivLayerProps[]
 }
