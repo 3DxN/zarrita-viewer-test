@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 
 import NavigationControls from './nav/navigator'
-import { VivViewerWrapper } from './map/VivViewerWrapper'
+import VivViewerWrapper from './map/VivViewerWrapper'
 import { getDefaultMaxContrastLimit, getInitialNavigationState } from './utils/getDefaults'
 import { useZarrStore } from '../../contexts/ZarrStoreContext'
 

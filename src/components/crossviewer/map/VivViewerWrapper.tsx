@@ -11,61 +11,64 @@ import {
 
 import { AltZarrPixelSource } from '../../../ext/AltZarrPixelSource'
 import { useZarrStore } from '../../../contexts/ZarrStoreContext'
+import { useFrameState } from '../../../contexts/FrameStateContext'
+import { useFrameInteraction } from '../../../hooks/useFrameInteraction'
 import { 
   FrameView, 
-  FRAME_VIEW_ID, 
-  createFrameOverlayLayers,
-  DragMode,
-  FrameInteractionState,
-  getCursorForDragMode,
-  calculateFrameResize
+  FRAME_VIEW_ID
 } from './FrameView'
 
 import type * as viv from "@vivjs/types";
-import type { NavigationState } from '../../../types/crossviewer'
-import { IMultiscaleInfo } from '../../../types/loader'
+import type { NavigationState, VivDetailViewState, VivViewState } from '../../../types/crossviewer'
+import type { IMultiscaleInfo } from '../../../types/loader'
 
-export { FRAME_VIEW_ID } from './FrameView'
 
-type VivWrapperProps = {
+const VivViewerWrapper: React.FC<{
   msInfo: IMultiscaleInfo
   navigationState: NavigationState
-}
-
-export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
+}> = ({
   msInfo,
   navigationState,
 }) => {
   const { root } = useZarrStore()
+  const { frameCenter, frameSize, setFrameCenter, setFrameSize } = useFrameState()
+  
   const [vivLoaders, setVivLoaders] = useState<AltZarrPixelSource[]>([])
   const [containerDimensions, setContainerDimensions] = useState({ width: 800, height: 600 })
-  const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
-  const [frameSize, setFrameSize] = useState<[number, number]>([400, 400])
-  const [frameInteraction, setFrameInteraction] = useState<FrameInteractionState>({
-    isDragging: false,
-    dragMode: 'none',
-    startPos: [0, 0],
-    startFrameCenter: [0, 0],
-    startFrameSize: [0, 0]
-  })
-  const [hoveredHandle, setHoveredHandle] = useState<string | null>(null)
-  const [detailViewDrag, setDetailViewDrag] = useState<{
-    isDragging: boolean,
-    startPos: [number, number],
-    startTarget: [number, number, number]
-  }>({
+  const [detailViewDrag, setDetailViewDrag] = useState<VivDetailViewState>({
     isDragging: false,
     startPos: [0, 0],
     startTarget: [0, 0, 0]
   })
   
   // Use controlled view states to prevent feedback loops
-  const [controlledDetailViewState, setControlledDetailViewState] = useState<any>(null)
+  const [controlledDetailViewState, setControlledDetailViewState] = useState<VivViewState | null>(null)
   const [isManuallyPanning, setIsManuallyPanning] = useState(false)
   
   // Use a ref to track the current detail view state without triggering re-renders
-  const detailViewStateRef = useRef<any>(null)
+  const detailViewStateRef = useRef<VivViewState | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const {
+    handleHover,
+    getCursor,
+    frameOverlayLayers,
+    onDragStart,
+    onDrag,
+    onDragEnd,
+    onClick
+  } = useFrameInteraction(
+    frameCenter, 
+    frameSize, 
+    setFrameCenter, 
+    setFrameSize, 
+    msInfo,
+    detailViewStateRef,
+    setIsManuallyPanning,
+    setDetailViewDrag,
+    detailViewDrag,
+    setControlledDetailViewState,
+  )
 
   // Hook to observe container size changes
   const updateDimensions = useCallback(() => {
@@ -148,7 +151,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
       const initialState = {
         target: [width / 2, height / 2, 0],
         zoom: -3
-      };
+      } satisfies VivViewState;
       
       console.log('Setting initial view state for lowest resolution:', initialState);
       detailViewStateRef.current = initialState;
@@ -204,72 +207,12 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
     })
   }, [navigationState.channelMap])
 
-
-  // Handle frame interactions (handles and move area are pickable)
-  const handleFrameInteraction = useCallback((info: any) => {
-    if (!info || !info.object) {
-      console.log('No interaction info or object, returning false');
-      return false;
-    }
-    
-    const layerType = info.object.type;
-    if (layerType && layerType.startsWith('resize-')) {
-      setFrameInteraction({
-        isDragging: true,
-        dragMode: layerType as DragMode,
-        startPos: [info.coordinate[0], info.coordinate[1]],
-        startFrameCenter: [...frameCenter],
-        startFrameSize: [...frameSize]
-      });
-      return true;
-    }
-    if (layerType === 'move') {
-      setFrameInteraction({
-        isDragging: true,
-        dragMode: 'move',
-        startPos: [info.coordinate[0], info.coordinate[1]],
-        startFrameCenter: [...frameCenter],
-        startFrameSize: [...frameSize]
-      });
-      return true;
-    }
-    return false;
-  }, [frameCenter, frameSize]);
-
-  // Create interactive frame overlay layers
-  const frameOverlayLayers = useMemo(() => {
-    if (!msInfo) {
-      console.log('returning empty frame overlay layers');
-      return [];
-    }
-
-    return createFrameOverlayLayers(frameCenter, frameSize, FRAME_VIEW_ID, {
-      fillColor: [0, 0, 0, 0] as [number, number, number, number], // Transparent - will be overridden anyway
-      lineColor: [255, 255, 255, 255] as [number, number, number, number],
-      lineWidth: 3,
-      filled: false, // Will be overridden - frame gets no fill, transparent fill layer added separately
-      stroked: true,
-      showHandles: true,
-      handleSize: 8, // Larger handles for easier interaction
-      hoveredHandle
-    });
-  }, [msInfo, frameCenter, frameSize, hoveredHandle]);
-
-  // Handle DeckGL hover events for visual feedback only
-  const handleHover = useCallback((info: any) => {
-    // Only update hover state for handles (only handles are pickable now)
-    if (!frameInteraction.isDragging && info.object && info.object.type && info.object.type.startsWith('resize-') && info.layer && info.layer.id && info.layer.id.includes('handle')) {
-      setHoveredHandle(info.object.type);
-    } else if (!frameInteraction.isDragging) {
-      // Clear hover when not over any handle - this includes moving from handle to frame area
-      if (hoveredHandle !== null) {
-        setHoveredHandle(null);
-      }
-    }
-  }, [frameInteraction.isDragging, hoveredHandle]);
-
   // Handle view state changes to keep frame synchronized
-  const handleViewStateChange = useCallback(({ viewId, viewState, oldViewState }: any) => {
+  const handleViewStateChange = useCallback(({ viewId, viewState }: {
+    viewId: string,
+    viewState: VivViewState,
+    oldViewState: VivViewState
+  }) => {
     if (viewId === DETAIL_VIEW_ID) {
       // Always update the ref to track current state
       detailViewStateRef.current = viewState
@@ -418,6 +361,7 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
         views={views}
         layerProps={layerProps}
         viewStates={viewStates}
+        // @ts-expect-error
         onViewStateChange={handleViewStateChange}
         deckProps={{
           style: { backgroundColor: 'black' },
@@ -431,159 +375,16 @@ export const VivViewerWrapper: React.FC<VivWrapperProps> = ({
             keyboard: true
           },
           pickingRadius: 15, // Increased picking radius for easier handle selection
-          onDragStart: (info: any) => {
-        
-            // Handle frame interactions first (highest priority)
-            if (info.layer && info.object) {
-              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-'))
-                || (info.layer.id.includes('move-area') && info.object.type === 'move')) {
-                const handled = handleFrameInteraction(info);
-                if (handled) {
-                  return true; // Stop propagation - we're handling this
-                }
-              }
-            }
-            
-            // For any drag that's not a frame interaction, start manual panning
-            // This works regardless of which viewport the event comes from
-            if (info.coordinate && detailViewStateRef.current) {
-              setIsManuallyPanning(true);
-              setDetailViewDrag({
-                isDragging: true,
-                startPos: [info.coordinate[0], info.coordinate[1]],
-                startTarget: [
-                  detailViewStateRef.current.target[0], 
-                  detailViewStateRef.current.target[1], 
-                  detailViewStateRef.current.target[2]
-                ]
-              });
-              return true; // We'll handle this manually
-            }
-            
-            // Fallback - let default behavior handle it
-            return false;
-          },
-          onDrag: (info: any) => {
-            if (frameInteraction.isDragging && info.coordinate) {
-              const [currentX, currentY] = info.coordinate;
-              const [startX, startY] = frameInteraction.startPos;
-              
-              const deltaX = currentX - startX;
-              const deltaY = currentY - startY;
-              
-              const result = calculateFrameResize(
-                frameInteraction.dragMode,
-                frameInteraction.startFrameCenter,
-                frameInteraction.startFrameSize,
-                deltaX,
-                deltaY
-              );
-              
-              setFrameCenter(result.center);
-              setFrameSize(result.size);
-              return true; // Stop propagation
-            }
-            
-            // Handle manual detail view panning
-            if (detailViewDrag.isDragging && info.coordinate) {
-              const [currentX, currentY] = info.coordinate;
-              const [startX, startY] = detailViewDrag.startPos;
-              
-              const deltaX = currentX - startX;
-              const deltaY = currentY - startY;
-              
-              // Calculate new target position
-              const newTarget = [
-                detailViewDrag.startTarget[0] - deltaX,
-                detailViewDrag.startTarget[1] - deltaY,
-                detailViewDrag.startTarget[2]
-              ];
-              
-              // Update controlled state to trigger view update
-              const newViewState = {
-                ...detailViewStateRef.current,
-                target: newTarget
-              };
-              
-              detailViewStateRef.current = newViewState;
-              setControlledDetailViewState(newViewState);
-              
-              return true; // Stop propagation
-            }
-            
-            return false; // Allow default behavior
-          },
-          onDragEnd: (info: any) => {
-            if (frameInteraction.isDragging) {
-              setFrameInteraction({
-                isDragging: false,
-                dragMode: 'none',
-                startPos: [0, 0],
-                startFrameCenter: [0, 0],
-                startFrameSize: [100, 100]
-              });
-              return true; // Stop propagation
-            }
-            
-            if (detailViewDrag.isDragging) {
-              setIsManuallyPanning(false);
-              setDetailViewDrag({
-                isDragging: false,
-                startPos: [0, 0],
-                startTarget: [0, 0, 0]
-              });
-              return true; // Stop propagation
-            }
-            
-            return false; // Allow default behavior
-          },
-          onClick: (info: any) => {
-            
-            // Only intercept events that hit our specific pickable frame objects
-            if (info.layer && info.viewport?.id === FRAME_VIEW_ID && info.object) {
-              if ((info.layer.id.includes('handle') && info.object.type?.startsWith('resize-')) ||
-                  (info.layer.id.includes('move-area') && info.object.type === 'move')) {
-                const handled = handleFrameInteraction(info);
-                if (handled) {
-                  return true; // Stop propagation - we're handling this
-                }
-              }
-            }
-            
-            // Handle overview clicks
-            if (info.viewport && info.viewport.id === OVERVIEW_VIEW_ID && info.coordinate) {
-              const [x, y] = info.coordinate
-              setFrameCenter([x, y])
-              // Let Viv handle the view state naturally
-              return true;
-            }
-            
-            // For all other cases, let default behavior handle it
-            return false;
-          },
+          onDragStart,
+          onDrag,
+          onDragEnd,
+          onClick,
           onHover: handleHover,
-          getCursor: (info: any) => {
-            if (frameInteraction.isDragging) {
-              return getCursorForDragMode(frameInteraction.dragMode);
-            }
-            if (detailViewDrag.isDragging) {
-              return 'grabbing';
-            }
-            if (hoveredHandle && hoveredHandle.startsWith('resize-')) {
-              return getCursorForDragMode(hoveredHandle as DragMode);
-            }
-            // Check if we're hovering over the frame move area
-            if (info && info.object && info.object.type === 'move' && info.layer && info.layer.id.includes('move-area')) {
-              return 'move';
-            }
-            // Show grab cursor when over frame view but not over any interactive elements
-            if (info && info.viewport?.id === FRAME_VIEW_ID && !info.layer) {
-              return 'grab';
-            }
-            return 'default';
-          }
+          getCursor
         }}
       />
     </div>
   )
 }
+
+export default VivViewerWrapper;

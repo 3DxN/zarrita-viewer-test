@@ -92,3 +92,15 @@ export interface ContrastLimitsProps {
 }
 
 export type ContrastLimits = [number | null, number | null];
+
+export interface VivViewState {
+  target: [number, number, number];
+  zoom: number;
+  [key: string]: any; // Viv may add more properties
+}
+
+export interface VivDetailViewState {
+  isDragging: boolean,
+  startPos: [number, number],
+  startTarget: [number, number, number] // [x, y, zoom]
+}
