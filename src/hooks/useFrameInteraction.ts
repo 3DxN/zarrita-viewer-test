@@ -1,17 +1,16 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import { OVERVIEW_VIEW_ID } from '@hms-dbmi/viv'
 import { 
-  DragMode,
-  FrameInteractionState,
   getCursorForDragMode,
   calculateFrameResize,
   createFrameOverlayLayers,
   FRAME_VIEW_ID
-} from '../app/components/crossviewer/map/FrameView'
+} from '../app/components/viewer2D/map/FrameView'
+import type { DragMode, FrameInteractionState } from '../types/frame'
 
 import type { PickingInfo } from 'deck.gl'
 import type { IMultiscaleInfo } from '../types/loader'
-import { VivDetailViewState, VivViewState } from '../types/crossviewer'
+import { VivDetailViewState, VivViewState } from '../types/viewer2D'
 
 
 export function useFrameInteraction(

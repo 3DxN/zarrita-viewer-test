@@ -2,7 +2,7 @@
 
 import React from 'react'
 
-import CrossViewer from './components/crossviewer'
+import CrossViewer from './components/viewer2D'
 import StoreLoader from './components/StoreLoader'
 import { ZarrStoreProvider } from '../contexts/ZarrStoreContext'
 import { Viewer2DDataProvider } from '../contexts/Viewer2DDataContext'

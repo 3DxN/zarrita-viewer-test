@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { VivViewState } from '../types/crossviewer'
+import type { VivViewState } from '../types/viewer2D'
 import type { IMultiscaleInfo } from '../types/loader'
 import type { AltZarrPixelSource } from '../ext/AltZarrPixelSource'
 

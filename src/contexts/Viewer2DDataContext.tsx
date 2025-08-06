@@ -4,7 +4,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo } from
 import * as zarrita from 'zarrita'
 
 import { useZarrStore } from './ZarrStoreContext'
-import type { NavigationState, VivViewState, Viewer2DDataContextType, Viewer2DDataProviderProps } from '../types/crossviewer'
+import type { NavigationState, VivViewState, Viewer2DDataContextType, Viewer2DDataProviderProps } from '../types/viewer2D'
 
 
 // Viewer2D data context type definition - imported from types

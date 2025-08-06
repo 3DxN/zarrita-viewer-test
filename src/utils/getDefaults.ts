@@ -1,7 +1,7 @@
 import type { DataType } from 'zarrita';
 
-import type { NavigationState, ChannelMapping } from '../../../../types/crossviewer';
-import type { IMultiscaleInfo } from '../../../../types/loader';
+import type { NavigationState, ChannelMapping } from '../types/viewer2D';
+import type { IMultiscaleInfo } from '../types/loader';
 
 
 // Helper to get default contrast limits for dtype

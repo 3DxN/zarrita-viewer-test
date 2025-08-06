@@ -2,18 +2,9 @@ import { VivView, DETAIL_VIEW_ID, OVERVIEW_VIEW_ID } from '@hms-dbmi/viv'
 import { OrthographicView } from '@deck.gl/core'
 import { PolygonLayer } from '@deck.gl/layers'
 import type { Layer } from '@deck.gl/core'
+import type { DragMode, FrameInteractionState } from '../../../../types/frame'
 
 export const FRAME_VIEW_ID = 'frame';
-
-export type DragMode = 'none' | 'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'resize-n' | 'resize-s' | 'resize-e' | 'resize-w';
-
-export interface FrameInteractionState {
-  isDragging: boolean;
-  dragMode: DragMode;
-  startPos: [number, number];
-  startFrameCenter: [number, number];
-  startFrameSize: [number, number];
-}
 
 /**
  * Create interactive polygon frame overlay layers with handles

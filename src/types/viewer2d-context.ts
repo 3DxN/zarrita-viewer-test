@@ -2,7 +2,7 @@
  * Viewer2D data context types for unified 2D viewer state management
  */
 
-import type { NavigationState, VivViewState } from './crossviewer'
+import type { NavigationState, VivViewState } from './viewer2D'
 
 export interface Viewer2DDataContextType {
   // Frame state (replaces FrameStateContext)

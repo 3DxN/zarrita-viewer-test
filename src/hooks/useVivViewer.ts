@@ -9,14 +9,14 @@ import {
 } from '@hms-dbmi/viv'
 
 import { AltZarrPixelSource } from '../ext/AltZarrPixelSource'
-import { FrameView, FRAME_VIEW_ID } from '../app/components/crossviewer/map/FrameView'
+import { FrameView, FRAME_VIEW_ID } from '../app/components/viewer2D/map/FrameView'
 
 import type * as viv from "@vivjs/types"
 import type { Layer } from 'deck.gl'
 import type { 
   VivViewState, VivDetailViewState, NavigationState,
   VivViewerState, VivViewerComputed, VivViewerActions 
-} from '../types/crossviewer'
+} from '../types/viewer2D'
 import type { IMultiscaleInfo } from '../types/loader'
 
 

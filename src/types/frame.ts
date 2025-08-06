@@ -7,8 +7,12 @@ export type FrameState = {
   size: [number, number];
 };
 
+export type DragMode = 'none' | 'move' | 'resize-nw' | 'resize-ne' | 'resize-sw' | 'resize-se' | 'resize-n' | 'resize-s' | 'resize-e' | 'resize-w';
+
 export interface FrameInteractionState {
-  isActive: boolean;
-  dragStart: [number, number] | null;
-  currentPosition: [number, number] | null;
+  isDragging: boolean;
+  dragMode: DragMode;
+  startPos: [number, number];
+  startFrameCenter: [number, number];
+  startFrameSize: [number, number];
 }

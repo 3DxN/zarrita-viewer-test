@@ -10,7 +10,7 @@ export type { AxisKey, MultiscaleShape, ChannelMapping, ContrastLimits, IStringA
 export type { NavigationState, NavigationLimits, NavigationHandlers } from './navigation'
 
 // Frame types
-export type { FrameInteractionState } from './frame'
+export type { FrameInteractionState, DragMode } from './frame'
 
 // Viv viewer types
 export type {
@@ -52,7 +52,7 @@ export type {
 export type {
   Viewer2DDataContextType,
   Viewer2DDataProviderProps
-} from './viewer2d-data'
+} from './viewer2d-context'
 
 // OME types - re-export everything
 export * from './ome'

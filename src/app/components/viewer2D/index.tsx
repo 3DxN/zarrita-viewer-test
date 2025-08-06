@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react'
 
 import NavigationControls from './nav/navigator'
 import VivViewerWrapper from './map/VivViewerWrapper'
-import { getDefaultMaxContrastLimit, getInitialNavigationState } from './utils/getDefaults'
+import { getDefaultMaxContrastLimit, getInitialNavigationState } from '../../../utils/getDefaults'
 import { useZarrStore } from '../../../contexts/ZarrStoreContext'
 
 import type { 
   NavigationState, NavigationLimits, 
   NavigationHandlers,ChannelMapping, ContrastLimits
-} from '../../../types/crossviewer'
+} from '../../../types/viewer2D'
 
 
 export default function CrossViewer() {
