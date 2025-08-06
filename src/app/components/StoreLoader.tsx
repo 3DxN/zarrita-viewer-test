@@ -17,9 +17,8 @@ export default function StoreLoader() {
     infoMessage,
     suggestedPaths, 
     suggestionType,
-    omeData,
     navigateToSuggestion,
-    hasLoadedStore
+    hasLoadedArray: hasLoadedStore
   } = useZarrStore()
   
   const [showSuccess, setShowSuccess] = useState(false)
@@ -54,268 +53,44 @@ export default function StoreLoader() {
     return null
   }
 
-  const renderPlateInterface = () => {
-    if (!omeData?.plate) return null
+  const renderSuggestions = () => {
+    let suggestionTitle = ''
+    let suggestionDescription = ''
 
-    const { rows, columns, wells } = omeData.plate
+    switch (suggestionType) {
+      case ZarrStoreSuggestionType.PLATE_WELL:
+        suggestionTitle = '📊 OME-Plate/Well structure detected'
+        suggestionDescription = 'OME-Plate/Wells are not supported for direct viewing.'
+        break
+      default:
+        suggestionTitle = '💡 Try these paths'
+        suggestionDescription = 'Click to load these potential OME-Zarr locations:'
+        break
+    }
 
     return (
-      <div style={{
+      <div style={{ 
         marginTop: '15px',
-        padding: '15px',
-        backgroundColor: '#e8f4f8',
-        borderRadius: '6px',
-        border: '1px solid #17a2b8'
+        padding: '10px',
+        backgroundColor: '#fff3cd',
+        color: '#856404',
       }}>
-        <div style={{ 
-          fontWeight: 'bold', 
-          marginBottom: '10px',
-          color: '#17a2b8',
-          fontSize: '16px'
-        }}>
-          📊 OME-Zarr Plate Structure Detected
+        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
+          {suggestionTitle}
         </div>
-        
-        {omeData.plate.name && (
+        {suggestionDescription && (
           <div style={{ marginBottom: '10px', fontSize: '14px' }}>
-            <strong>Plate:</strong> {omeData.plate.name}
+            {suggestionDescription}
           </div>
         )}
-        
-        <div style={{ marginBottom: '15px', fontSize: '14px' }}>
-          <strong>Dimensions:</strong> {rows.length} rows × {columns.length} columns ({wells.length} wells)
-        </div>
-
-        <div style={{ marginBottom: '10px', fontWeight: 'bold' }}>
-          Select a well to view:
-        </div>
-
-        {/* Plate grid */}
-        <div style={{ 
-          display: 'grid',
-          gridTemplateColumns: `40px repeat(${columns.length}, 1fr)`,
-          gap: '2px',
-          fontSize: '12px',
-          maxWidth: '100%',
-          overflow: 'auto'
-        }}>
-          {/* Column headers */}
-          <div></div>
-          {columns.map((col, colIndex) => (
-            <div key={colIndex} style={{ 
-              textAlign: 'center', 
-              fontWeight: 'bold',
-              padding: '4px',
-              backgroundColor: '#f8f9fa',
-              border: '1px solid #dee2e6'
-            }}>
-              {col.name}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', width: '100%' }}>
+          {suggestedPaths.length === 0 && (
+            <div style={{ textAlign: 'center', width: '100%' }}>
+              No suggested paths found.
             </div>
-          ))}
-
-          {/* Rows with wells */}
-          {rows.map((row, rowIndex) => (
-            <React.Fragment key={rowIndex}>
-              {/* Row header */}
-              <div style={{ 
-                textAlign: 'center', 
-                fontWeight: 'bold',
-                padding: '4px',
-                backgroundColor: '#f8f9fa',
-                border: '1px solid #dee2e6',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                {row.name}
-              </div>
-              
-              {/* Wells for this row */}
-              {columns.map((col, colIndex) => {
-                const well = wells.find(w => w.rowIndex === rowIndex && w.columnIndex === colIndex)
-                
-                return (
-                  <div key={`${rowIndex}-${colIndex}`} style={{
-                    border: '1px solid #dee2e6',
-                    minHeight: '40px'
-                  }}>
-                    {well ? (
-                      <button
-                        onClick={() => navigateToSuggestion(well.path)}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          minHeight: '40px',
-                          backgroundColor: '#28a745',
-                          color: 'white',
-                          border: 'none',
-                          cursor: 'pointer',
-                          fontSize: '10px',
-                          padding: '2px',
-                          transition: 'background-color 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor = '#218838'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.backgroundColor = '#28a745'
-                        }}
-                        title={`Well ${row.name}${col.name}: ${well.path}`}
-                      >
-                        {row.name}{col.name}
-                      </button>
-                    ) : (
-                      <div style={{
-                        width: '100%',
-                        height: '100%',
-                        minHeight: '40px',
-                        backgroundColor: '#f8f9fa',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: '#6c757d'
-                      }}>
-                        -
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div style={{ 
-          fontSize: '11px', 
-          marginTop: '10px', 
-          color: '#6c757d',
-          textAlign: 'center'
-        }}>
-          Click on a well to load that location
-        </div>
-      </div>
-    )
-  }
-
-  const renderWellInterface = () => {
-    if (!omeData?.well) return null
-
-    const { images } = omeData.well
-
-    return (
-      <div style={{
-        marginTop: '15px',
-        padding: '15px',
-        backgroundColor: '#f0f8ff',
-        borderRadius: '6px',
-        border: '1px solid #007bff'
-      }}>
-        <div style={{ 
-          fontWeight: 'bold', 
-          marginBottom: '10px',
-          color: '#007bff',
-          fontSize: '16px',
-          textAlign: 'center'
-        }}>
-          🖼️ OME-Zarr Well Images Detected
-        </div>
-        
-        <div style={{ marginBottom: '15px', fontSize: '14px', textAlign: 'center' }}>
-          <strong>Available Images:</strong> {images.length} images found in this well
-        </div>
-
-        <div style={{ marginBottom: '10px', fontWeight: 'bold', textAlign: 'center' }}>
-          Select an image to view:
-        </div>
-
-        {/* Images grid */}
-        <div style={{ 
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-          gap: '10px',
-          maxWidth: '100%'
-        }}>
-          {images.map((image, index) => (
-            <button
-              key={index}
-              onClick={() => navigateToSuggestion(image.path)}
-              style={{
-                padding: '15px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 'bold',
-                transition: 'all 0.2s',
-                textAlign: 'center',
-                minHeight: '60px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0056b3'
-                e.currentTarget.style.transform = 'translateY(-2px)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#007bff'
-                e.currentTarget.style.transform = 'translateY(0)'
-              }}
-              title={`Load image: ${image.path}`}
-            >
-              <div style={{ fontSize: '20px', marginBottom: '5px' }}>🖼️</div>
-              <div>Image {image.path}</div>
-            </button>
-          ))}
-        </div>
-
-        <div style={{ 
-          fontSize: '11px', 
-          marginTop: '10px', 
-          color: '#6c757d',
-          textAlign: 'center'
-        }}>
-          Click on an image to load that location
-        </div>
-      </div>
-    )
-  }
-
-  const renderSuggestions = () => {
-    if (suggestionType === ZarrStoreSuggestionType.PLATE && omeData?.plate) {
-      return renderPlateInterface()
-    }
-
-    if (suggestionType === ZarrStoreSuggestionType.WELL && omeData?.well) {
-      return renderWellInterface()
-    }
-
-    // For no-multiscale case, show error message and suggestions if available
-    if (suggestionType === ZarrStoreSuggestionType.NO_MULTISCALE) {
-      return (
-        <div style={{ 
-          marginTop: '15px',
-          padding: '15px',
-          backgroundColor: '#f8d7da',
-          color: '#721c24',
-          borderRadius: '6px',
-          border: '1px solid #f5c6cb',
-          textAlign: 'center'
-        }}>
-          <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '16px' }}>
-            ❌ Invalid OME-Zarr Structure
-          </div>
-          <div style={{ fontSize: '14px', marginBottom: suggestedPaths.length > 0 ? '15px' : '0' }}>
-            OME metadata was found but no multiscale data is present.<br/>
-            {suggestedPaths.length > 0 && 'Try these subdirectories instead:'}
-          </div>
-          
-          {/* Show suggestions for no-multiscale case */}
+          )}
           {suggestedPaths.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '8px', width: '100%' }}>
               {suggestedPaths.map((suggestion, index) => (
                 <button
                   key={index}
@@ -347,104 +122,13 @@ export default function StoreLoader() {
                         : 'Zarr array - click to load'
                   }
                 >
-                  {suggestion.hasOme && '🔬 '}
-                  {suggestion.isGroup && !suggestion.hasOme && '📁 '}
-                  {!suggestion.isGroup && '📊 '}
                   {suggestion.path}
                 </button>
               ))}
             </div>
           )}
-          
-          {suggestedPaths.length > 0 && (
-            <div style={{ fontSize: '11px', marginTop: '8px', opacity: 0.8 }}>
-              🔬 = OME metadata, 📁 = Group, 📊 = Array<br/>
-              Click a path to load that location
-            </div>
-          )}
-        </div>
-      )
-    }
-
-    if (suggestedPaths.length === 0) return null
-
-    let suggestionTitle = ''
-    let suggestionDescription = ''
-
-    switch (suggestionType) {
-      case ZarrStoreSuggestionType.PLATE:
-        suggestionTitle = '📊 Plate structure detected'
-        suggestionDescription = 'Select a well from the plate above:'
-        break
-      case ZarrStoreSuggestionType.WELL:
-        suggestionTitle = '🖼️ Well images detected'
-        suggestionDescription = 'Select an image from the well above:'
-        break
-      case ZarrStoreSuggestionType.GENERIC:
-      default:
-        suggestionTitle = '💡 Try these paths'
-        suggestionDescription = 'Click to load these potential OME-Zarr locations:'
-        break
-    }
-
-    return (
-      <div style={{ 
-        marginTop: '15px',
-        padding: '10px',
-        backgroundColor: '#fff3cd',
-        color: '#856404',
-        borderRadius: '4px',
-        border: '1px solid #ffeaa7'
-      }}>
-        <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>
-          {suggestionTitle}
-        </div>
-        {suggestionDescription && (
-          <div style={{ marginBottom: '10px', fontSize: '14px' }}>
-            {suggestionDescription}
-          </div>
-        )}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-          {suggestedPaths.map((suggestion, index) => (
-            <button
-              key={index}
-              onClick={() => navigateToSuggestion(suggestion.path)}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: suggestion.hasOme ? '#28a745' : suggestion.isGroup ? '#17a2b8' : '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                fontSize: '12px',
-                cursor: 'pointer',
-                textDecoration: 'none',
-                transition: 'background-color 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                const btn = e.target as HTMLButtonElement
-                btn.style.opacity = '0.8'
-              }}
-              onMouseLeave={(e) => {
-                const btn = e.target as HTMLButtonElement
-                btn.style.opacity = '1'
-              }}
-              title={
-                suggestion.hasOme 
-                  ? 'OME-Zarr group - click to load' 
-                  : suggestion.isGroup 
-                    ? 'Zarr group - click to load' 
-                    : 'Zarr array - click to load'
-              }
-            >
-              {suggestion.hasOme && '🔬 '}
-              {suggestion.isGroup && !suggestion.hasOme && '📁 '}
-              {!suggestion.isGroup && '📊 '}
-              {suggestion.path}
-            </button>
-          ))}
         </div>
         <div style={{ fontSize: '11px', marginTop: '8px', opacity: 0.8 }}>
-          🔬 = OME metadata, 📁 = Group, 📊 = Array<br/>
           Click a path to load that location
         </div>
       </div>
@@ -498,14 +182,14 @@ export default function StoreLoader() {
             color: '#007bff',
             fontSize: '24px'
           }}>
-            🔬 AIDA OME-Zarr Loader
+            🔬 AIDA Image Loader
           </h2>
           <p style={{ 
             margin: 0, 
             color: '#6c757d',
             fontSize: '16px'
           }}>
-            Please load an OME-Zarr store to begin exploring your data
+            Load an OME-Zarr, DeepZoom or TIFF store to begin exploring your data
           </p>
         </div>
         
@@ -518,7 +202,7 @@ export default function StoreLoader() {
               fontSize: '16px',
               color: '#333'
             }}>
-              Zarr Store URL:
+              Store URL:
             </label>
             <input 
               type="text" 
@@ -622,69 +306,32 @@ export default function StoreLoader() {
           </div>
         )}
         
-        {error && !hasLoadedStore && (
+        {(infoMessage || error) && !hasLoadedStore && (
           <div style={{ 
             marginTop: '15px',
-            color: (suggestionType === ZarrStoreSuggestionType.PLATE || suggestionType === ZarrStoreSuggestionType.WELL) ? '#856404' : '#721c24', 
-            backgroundColor: (suggestionType === ZarrStoreSuggestionType.PLATE || suggestionType === ZarrStoreSuggestionType.WELL) ? '#fff3cd' : '#f8d7da', 
+            color: ([ZarrStoreSuggestionType.PLATE_WELL, ZarrStoreSuggestionType.NO_MULTISCALE]
+              .includes(suggestionType)) ? '#856404' : '#721c24', 
+            backgroundColor: ([ZarrStoreSuggestionType.PLATE_WELL, ZarrStoreSuggestionType.NO_MULTISCALE]
+              .includes(suggestionType)) ? '#fff3cd' : '#f8d7da', 
             padding: '15px', 
             borderRadius: '6px',
             fontSize: '16px',
             textAlign: 'center',
-            border: (suggestionType === ZarrStoreSuggestionType.PLATE || suggestionType === ZarrStoreSuggestionType.WELL) ? '1px solid #ffeaa7' : 'none'
+            border: ([ZarrStoreSuggestionType.PLATE_WELL, ZarrStoreSuggestionType.NO_MULTISCALE]
+              .includes(suggestionType)) ? '1px solid #ffeaa7' : 'none'
           }}>
-            {suggestionType === ZarrStoreSuggestionType.PLATE ? (
+            {suggestionType === ZarrStoreSuggestionType.PLATE_WELL ? (
               <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <strong>📊 Plate Structure Detected</strong>
+                <strong>📊 OME-Plate/Well Structure Detected</strong>
               </div>
-            ) : suggestionType === ZarrStoreSuggestionType.WELL ? (
-              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                <strong>🖼️ Well Images Detected</strong>
-              </div>
+            ) : infoMessage ? (
+              <>ℹ️ {infoMessage}</>
             ) : (
               <>❌ {error}</>
             )}
             
             {/* Show OME-Zarr specific suggestions */}
             {renderSuggestions()}
-          </div>
-        )}
-
-        {/* Show info message for well/plate selection */}
-        {infoMessage && !hasLoadedStore && (
-          <div style={{ 
-            marginTop: '15px',
-            color: '#856404',
-            backgroundColor: '#fff3cd',
-            padding: '15px', 
-            borderRadius: '6px',
-            fontSize: '16px',
-            textAlign: 'center',
-            border: '1px solid #ffeaa7'
-          }}>
-            <div style={{ marginBottom: '8px' }}>
-              {suggestionType === ZarrStoreSuggestionType.PLATE ? (
-                <strong>📊 OME-Zarr Plate Detected</strong>
-              ) : suggestionType === ZarrStoreSuggestionType.WELL ? (
-                <strong>🖼️ OME-Zarr Well Detected</strong>
-              ) : (
-                <strong>💡 Info</strong>
-              )}
-            </div>
-            <div>{infoMessage}</div>
-          </div>
-        )}
-
-        {/* Show interfaces when plate/well is detected (either error or info) */}
-        {((!error && !infoMessage) || (infoMessage && suggestionType === ZarrStoreSuggestionType.PLATE)) && omeData?.plate && (
-          <div>
-            {renderPlateInterface()}
-          </div>
-        )}
-
-        {((!error && !infoMessage) || (infoMessage && suggestionType === ZarrStoreSuggestionType.WELL)) && omeData?.well && (
-          <div>
-            {renderWellInterface()}
           </div>
         )}
 
@@ -697,18 +344,7 @@ export default function StoreLoader() {
             fontSize: '14px',
             color: '#6c757d'
           }}>
-            <strong>💡 Tip:</strong> You can use the sample URL above or paste your own OME-Zarr store URL
-          </div>
-        )}
-
-        {store && (
-          <div style={{ 
-            marginTop: '20px', 
-            textAlign: 'center',
-            fontSize: '14px',
-            color: '#6c757d'
-          }}>
-            Store loaded successfully! You can now use the viewers.
+            <strong>💡 Tip:</strong> You can use the sample OME-Zarr URL above or paste your own store URL
           </div>
         )}
       </div>

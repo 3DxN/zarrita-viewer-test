@@ -10,7 +10,7 @@ export type { AxisKey, MultiscaleShape, ChannelMapping, ContrastLimits, IStringA
 export type { NavigationState, NavigationLimits, NavigationHandlers } from './navigation'
 
 // Frame types
-export type { FrameState, FrameStateContextType, FrameInteractionState } from './frame'
+export type { FrameInteractionState } from './frame'
 
 // Viv viewer types
 export type {
@@ -47,6 +47,12 @@ export type {
   ZarrStoreContextType,
   ZarrStoreProviderProps
 } from './store'
+
+// Viewer2D data context types
+export type {
+  Viewer2DDataContextType,
+  Viewer2DDataProviderProps
+} from './viewer2d-data'
 
 // OME types - re-export everything
 export * from './ome'

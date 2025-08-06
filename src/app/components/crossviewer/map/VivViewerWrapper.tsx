@@ -2,7 +2,7 @@ import React from 'react'
 import { VivViewer } from '@hms-dbmi/viv'
 
 import { useZarrStore } from '../../../../contexts/ZarrStoreContext'
-import { useFrameState } from '../../../../contexts/FrameStateContext'
+import { useViewer2DData } from '../../../../contexts/Viewer2DDataContext'
 import { useFrameInteraction } from '../../../../hooks/useFrameInteraction'
 import useVivViewer from '../../../../hooks/useVivViewer'
 import { useFrameInitialization } from '../../../../hooks/useFrameInitialization'
@@ -19,7 +19,7 @@ const VivViewerWrapper: React.FC<{
   navigationState,
 }) => {
   const { root } = useZarrStore()
-  const { frameCenter, frameSize, setFrameCenter, setFrameSize } = useFrameState()
+  const { frameCenter, frameSize, setFrameCenter, setFrameSize } = useViewer2DData()
   
   // Use the comprehensive Viv viewer hook first 
   const {

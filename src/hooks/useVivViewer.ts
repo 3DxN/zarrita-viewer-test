@@ -23,7 +23,7 @@ import type { IMultiscaleInfo } from '../types/loader'
 export default function useVivViewer(
   msInfo: IMultiscaleInfo,
   navigationState: NavigationState,
-  root: zarrita.Group<zarrita.FetchStore> | null
+  root: zarrita.Location<zarrita.FetchStore> | null
 ): VivViewerState & VivViewerComputed & VivViewerActions {
   
   // Core state
@@ -150,7 +150,6 @@ export default function useVivViewer(
   // Generate view instances
   const views = useMemo(() => {
     if (vivLoaders.length === 0) {
-      console.log('views is returning empty array', { vivLoaders })
       return []
     }
 
@@ -181,7 +180,6 @@ export default function useVivViewer(
   // Generate view states
   const viewStates = useMemo(() => {
     if (vivLoaders.length === 0 || views.length === 0) {
-      console.log('viewStates is returning empty array', { vivLoaders, views })
       return []
     }
 

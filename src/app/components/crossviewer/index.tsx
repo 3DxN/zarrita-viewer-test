@@ -14,7 +14,7 @@ import type {
 
 
 export default function CrossViewer() {
-  const { hasLoadedStore, msInfo } = useZarrStore()
+  const { hasLoadedArray: hasLoadedStore, msInfo } = useZarrStore()
   
   // Navigation state, limits and handlers
   const [navigationState, setNavigationState] = useState<NavigationState | null>(null)

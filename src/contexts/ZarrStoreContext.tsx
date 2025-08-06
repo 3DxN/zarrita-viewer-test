@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import * as zarrita from 'zarrita'
 
 import { 
@@ -29,17 +29,219 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
     root: null,
     omeData: null,
     msInfo: null,
+    cellposeArray: null,
+    isCellposeLoading: false,
+    cellposeError: null,
     isLoading: false,
     error: null,
     infoMessage: null,
     source: initialSource,
-    hasLoadedStore: false,
+    hasLoadedArray: false,
     suggestedPaths: [],
-    suggestionType: ZarrStoreSuggestionType.GENERIC
+    suggestionType: ZarrStoreSuggestionType.NO_OME
   })
 
   const setSource = useCallback((url: string) => {
     setState(prev => ({ ...prev, source: url }))
+  }, [])
+
+  // Cellpose detection utility
+  const detectCellposeArray = useCallback(async (): Promise<zarrita.Array<any> | null> => {
+    if (!state.store) return null;
+
+    try {
+      console.log('🔍 Searching for Cellpose data at labels/Cellpose...')
+
+      // Create a temporary root from the base `store` to search from the top level.
+      const rootGroup = zarrita.root(state.store)
+      const cellposeGroup = await zarrita.open(rootGroup.resolve('labels/Cellpose'))
+
+      if (cellposeGroup instanceof zarrita.Group) {
+        // Drill into OME multiscales metadata
+        const multiscales = (cellposeGroup.attrs?.ome as OMEAttrs)?.multiscales
+        if (multiscales && multiscales[0]?.datasets?.[0]?.path) {
+          // Always use the first dataset (highest resolution)
+          const array = await zarrita.open(
+            cellposeGroup.resolve(multiscales[0].datasets[0].path)
+          )
+          if (array instanceof zarrita.Array) {
+            console.log('✅ Cellpose array found:', array)
+            return array
+          }
+        }
+      }
+      // If it's already an array, just return it
+      if (cellposeGroup instanceof zarrita.Array) {
+        console.log('✅ Cellpose array found (direct array):', cellposeGroup)
+        return cellposeGroup
+      }
+      // If not found, return null
+      return null
+    } catch (error) {
+      console.log(`❌ No Cellpose data at labels/Cellpose:`, error)
+      return null
+    }
+  }, [state.store])
+
+  // Load Cellpose data when multiscale image is ready
+  const refreshCellposeData = useCallback(async () => {
+    if (!state.hasLoadedArray || !state.msInfo) {
+      setState(prev => ({ 
+        ...prev, 
+        cellposeArray: null, 
+        cellposeError: null,
+        isCellposeLoading: false 
+      }))
+      return
+    }
+
+    setState(prev => ({ ...prev, isCellposeLoading: true, cellposeError: null }))
+
+    try {
+      const cellposeArr = await detectCellposeArray()
+      
+      setState(prev => ({ 
+        ...prev, 
+        cellposeArray: cellposeArr,
+        isCellposeLoading: false,
+        cellposeError: null
+      }))
+      
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error loading Cellpose data'
+      console.error('❌ Error loading Cellpose data:', errorMessage)
+      setState(prev => ({ 
+        ...prev, 
+        cellposeError: errorMessage,
+        cellposeArray: null,
+        isCellposeLoading: false
+      }))
+    }
+  }, [state.hasLoadedArray, state.msInfo, detectCellposeArray])
+
+  // Function to process a group and extract OME metadata
+  // to further predict the internal structure
+  const processGroup = useCallback(async (
+    grp: zarrita.Group<zarrita.FetchStore>
+  ) => {
+    console.log('📊 Group loaded:', grp)
+
+    // Use utility functions to determine the data type
+    const attrs = (grp.attrs?.ome ?? grp.attrs) as OMEAttrs
+    
+    // Check if this is a plate using utility function
+    if (omeUtils.isOmePlate(attrs) || omeUtils.isOmeWell(attrs)) {
+      console.log('🧪 Detected OME-Zarr plate/well structure')
+      setState(prev => ({
+        ...prev,
+        omeData: attrs,
+        isLoading: false,
+        error: null,
+        infoMessage: 'OME-Plate/OME-Well structure is not supported.',
+        hasLoadedArray: false,
+        suggestedPaths: [],
+        suggestionType: ZarrStoreSuggestionType.PLATE_WELL
+      }))
+      return
+    }
+    
+    // Check if this has multiscales using utility function
+    if (omeUtils.isOmeMultiscales(attrs)) {
+      console.log('📈 Detected OME-Zarr multiscales structure')
+      
+      // Extract available resolutions from multiscales
+      const multiscales = attrs.multiscales![0]
+      const availableResolutions = multiscales.datasets.map(dataset => dataset.path)
+      const axes = multiscales.axes?.map(axis => axis.name) || []
+      
+      // Extract available channels (if present in OMERO metadata)
+      let availableChannels: string[] = []
+      if (attrs.omero?.channels) {
+        availableChannels = attrs.omero.channels.map((ch, idx) => 
+          ch.label || `Channel ${idx}`
+        )
+      }
+
+      // Load the lowest resolution array to get the shape and dtype
+      const lowestResArray = await zarrita.open(
+        grp.resolve(multiscales.datasets[0].path)
+      ) as zarrita.Array<zarrita.DataType>
+
+      const shape = axes.reduce((acc, axis) => {
+        acc[axis as AxisKey] = lowestResArray.shape[axes.indexOf(axis)]
+        return acc
+      }, {} as MultiscaleShape)
+
+      if (!availableChannels) {
+        availableChannels = Array(shape.c).fill(null).map((_, index) => `Channel ${index + 1}`);
+      }
+
+      // Extract multiscale Information
+      const msInfo = {
+        shape,
+        dtype: lowestResArray.dtype,
+        resolutions: availableResolutions,
+        channels: availableChannels
+      } as IMultiscaleInfo;
+
+      setState(prev => ({
+        ...prev,
+        omeData: attrs,
+        msInfo: msInfo,
+        isLoading: false,
+        error: null,
+        infoMessage: null,
+        hasLoadedArray: true,
+        suggestedPaths: [],
+      }))
+
+      console.log('[ZarrStoreContext] ✅ Group processed successfully')
+      return
+    }
+
+    // ...existing code...
+    if (attrs && (!attrs.multiscales || attrs.multiscales.length === 0)) {
+      console.log('OME metadata found but no multiscales - suggesting subdirectories');
+      
+      const suggestedPaths: ZarrStoreSuggestedPath[] = [];
+      const commonPaths = ['0', '1', '2', '3', '4', '5', 'labels', 'metadata'];
+
+      for (const path of commonPaths) {
+        try {
+          const childOpened = await zarrita.open(grp.resolve(path));
+          if (childOpened.attrs) {
+            const hasOme = childOpened.attrs.ome || childOpened.attrs.multiscales;
+            suggestedPaths.push({
+              path,
+              isGroup: true,
+              hasOme: !!hasOme
+            });
+          } else {
+            suggestedPaths.push({
+              path,
+              isGroup: false,
+              hasOme: false
+            });
+          }
+        } catch {
+          // Path doesn't exist, skip
+        }
+      }
+
+      setState(prev => ({
+        ...prev,
+        omeData: attrs,
+        isLoading: false,
+        error: null,
+        infoMessage: 'No multiscale image found.',
+        suggestedPaths,
+        suggestionType: ZarrStoreSuggestionType.NO_MULTISCALE
+      }));
+      return;
+    }
+
+    // If none of the above match, this is not a supported OME-Zarr structure
+    throw new Error("No supported OME-Zarr structure found in metadata")
   }, [])
 
   const loadStore = useCallback(async (url: string) => {
@@ -49,260 +251,75 @@ export function ZarrStoreProvider({ children, initialSource = '' }: ZarrStorePro
       console.log('Loading Zarr store from:', url)
       
       const store = new zarrita.FetchStore(url)
-      const grp = await zarrita.open(store)
+      const opened = await zarrita.open(store)
       
       // Check if this is actually a group (not an array)
-      if (grp instanceof zarrita.Array) {
+      if (opened instanceof zarrita.Array) {
         throw new Error("This appears to be an array, not a group. OME-Zarr requires group structure.")
       }
 
-      console.log('📊 Group loaded:', grp)
-      console.log('📋 Attributes:', grp.attrs)
-
-      // Use utility functions to determine the data type
-      const attrs = (grp.attrs?.ome ?? grp.attrs) as OMEAttrs
+      // ✅ ALWAYS set store and root first - even if processGroup fails later
+      setState(prev => ({ ...prev, store, root: opened }))
       
-      // Check if this is a plate using utility function
-      if (omeUtils.isOmePlate(attrs)) {
-        console.log('🧪 Detected OME-Zarr plate structure')
-        setState(prev => ({
-          ...prev,
-          store,
-          root: grp,
-          omeData: attrs,
-          isLoading: false,
-          error: null,
-          infoMessage: 'Please select a well from the plate below to continue.',
-          source: url,
-          hasLoadedStore: false, // Keep false so modal stays open for well selection
-          suggestedPaths: [],
-          suggestionType: ZarrStoreSuggestionType.PLATE
-        }))
-        return
-      }
-
-      // Check if this is a well using utility function
-      if (omeUtils.isOmeWell(attrs)) {
-        console.log('🔬 Detected OME-Zarr well structure')
-        setState(prev => ({
-          ...prev,
-          store,
-          root: grp,
-          omeData: attrs,
-          isLoading: false,
-          error: null,
-          infoMessage: 'Please select an image from the well below to continue.',
-          source: url,
-          hasLoadedStore: false, // Keep false so modal stays open for image selection
-          suggestedPaths: [],
-          suggestionType: ZarrStoreSuggestionType.WELL
-        }))
-        return
-      }
-      
-      // Check if this has multiscales using utility function
-      if (omeUtils.isOmeMultiscales(attrs)) {
-        console.log('📈 Detected OME-Zarr multiscales structure')
-        
-        // Extract available resolutions from multiscales
-        const multiscales = attrs.multiscales![0]
-        const availableResolutions = multiscales.datasets.map(dataset => dataset.path)
-        const axes = multiscales.axes?.map(axis => axis.name) || []
-        
-        // Extract available channels (if present in OMERO metadata)
-        let availableChannels: string[] = []
-        if (attrs.omero?.channels) {
-          availableChannels = attrs.omero.channels.map((ch, idx) => 
-            ch.label || `Channel ${idx}`
-          )
-        }
-
-        // Load the lowest resolution array to get the shape and dtype
-        const lowestResArray = await zarrita.open(
-          grp.resolve(multiscales.datasets[0].path)
-        ) as zarrita.Array<zarrita.DataType>
-
-        const shape = axes.reduce((acc, axis) => {
-          acc[axis as AxisKey] = lowestResArray.shape[axes.indexOf(axis)]
-          return acc
-        }, {} as MultiscaleShape)
-
-        if (!availableChannels) {
-          availableChannels = Array(shape.c).fill(null).map((_, index) => `Channel ${index + 1}`);
-        }
-
-        // Extract multiscale Information
-        const msInfo = {
-          shape,
-          dtype: lowestResArray.dtype,
-          resolutions: availableResolutions,
-          channels: availableChannels
-        } as IMultiscaleInfo;
-
-        setState(prev => ({
-          ...prev,
-          store,
-          root: grp,
-          omeData: attrs,
-          msInfo: msInfo,
-          isLoading: false,
-          error: null,
-          infoMessage: null,
-          source: url,
-          hasLoadedStore: true,
-          suggestedPaths: [],
-          suggestionType: ZarrStoreSuggestionType.GENERIC
-        }))
-
-        console.log('[ZarrStoreContext] ✅ Store loaded successfully:')
-        return
-      }
-
-      // If none of the above match, this is not a supported OME-Zarr structure
-      throw new Error("No supported OME-Zarr structure found in metadata")
+      // Now process the group
+      await processGroup(opened)
       
     } catch (error) {
       console.error('Error loading Zarr store:', error)
-      let errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      
-      // Implement OME-Zarr specific error handling
-      let suggestedPaths: Array<ZarrStoreSuggestedPath> = []
-      let suggestionType: ZarrStoreSuggestionType = ZarrStoreSuggestionType.GENERIC
-      let errorOmeData: OMEAttrs | null = null
-      
-      try {
-        console.log('Exploring Zarr structure for OME-specific suggestions...')
-        const store: zarrita.FetchStore = new zarrita.FetchStore(url)
-        
-        // Try to open to check OME metadata
-        const opened = await zarrita.open(store)
-        
-        // Check if this is a group with attrs
-        if ('attrs' in opened && opened.attrs && opened.attrs.ome) {
-          const grp = opened as zarrita.Group<zarrita.FetchStore>
-          const omeMetadata = grp.attrs.ome as OMEAttrs
-          
-          // Case 1: Plate structure detected (even if there was an error)
-          if (omeMetadata.plate) {
-            console.log('Plate structure detected in OME metadata')
-            suggestionType = ZarrStoreSuggestionType.PLATE
-            errorOmeData = omeMetadata
-            
-            // For plate structure, we don't suggest paths here - the UI will handle plate display
-            // The plate metadata will be available in the error state
-          }
-          // Case 1.5: Well structure detected (even if there was an error)
-          else if (omeMetadata.well) {
-            console.log('Well structure detected in OME metadata')
-            suggestionType = ZarrStoreSuggestionType.WELL
-            errorOmeData = omeMetadata
-            
-            // For well structure, we don't suggest paths here - the UI will handle image display
-            // The well metadata will be available in the error state
-          }
-          // Case 2: OME metadata exists but no multiscale - this is invalid, suggest subdirectories
-          else if (!omeMetadata.multiscales || omeMetadata.multiscales.length === 0) {
-            console.log('OME metadata found but no multiscales - invalid OME-Zarr structure, suggesting subdirectories - hi test')
-            suggestionType = ZarrStoreSuggestionType.NO_MULTISCALE
-            
-            // Try to find common paths that might contain valid OME-Zarr data
-            const commonPaths = ['0', '1', '2', '3', '4', '5', 'labels', 'metadata']
-            for (const path of commonPaths) {
-              console.log(`Testing path: ${path}`)
-              const root = zarrita.root(store)
-              
-              // Check if this has OME metadata
-              try {
-                const childOpened = await zarrita.open(root.resolve(path))
-                
-                // Check if it's a group with OME metadata
-                if ('attrs' in childOpened && childOpened.attrs) {
-                  const hasOme = childOpened.attrs.ome || childOpened.attrs.multiscales
-                  
-                  suggestedPaths.push({
-                    path,
-                    isGroup: true,
-                    hasOme: !!hasOme
-                  })
-                } else {
-                  // It's an array
-                  suggestedPaths.push({
-                    path,
-                    isGroup: false,
-                    hasOme: false
-                  })
-                }
-              } catch {
-                // Do nothing - path doesn't exist
-              }
-            }
-          }
-        } else {
-          // Check attrs labels
-          const attrs = opened.attrs;
-          if (attrs && attrs.labels && attrs.labels instanceof Array && attrs.labels.includes('Cellpose')) {
-            // Case 3: CellPose Data - suggest the "CellPose" subdirectory
-            console.log('CellPose data detected, suggesting the "CellPose" subdirectory')
-
-            suggestionType = ZarrStoreSuggestionType.CELLPOSE
-            suggestedPaths.push({
-              path: 'Cellpose',
-              isGroup: true,
-              hasOme: false
-            })
-          }
-          // Case 4: No OME metadata - fall back to generic exploration
-          console.log('No OME metadata found...')
-          suggestionType = ZarrStoreSuggestionType.GENERIC
-          // Don't suggest any paths for completely missing OME metadata
-        }
-        
-        // Sort suggestions: OME groups first, then other groups, then arrays
-        suggestedPaths.sort((a, b) => {
-          if (a.hasOme && !b.hasOme) return -1
-          if (!a.hasOme && b.hasOme) return 1
-          if (a.isGroup && !b.isGroup) return -1
-          if (!a.isGroup && b.isGroup) return 1
-          return a.path.localeCompare(b.path)
-        })
-        
-      } catch (explorationError) {
-        console.log('Could not explore structure:', explorationError)
-        
-        // If exploration fails completely, this is likely an invalid or inaccessible URL
-        suggestionType = ZarrStoreSuggestionType.GENERIC
-        errorMessage = "Could not explore OME-Zarr structure. Please check the URL or ensure it is a valid store."
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
       
       setState(prev => ({
         ...prev,
-        store: null,
-        root: null,
-        omeData: errorOmeData,
         isLoading: false,
         error: errorMessage,
         infoMessage: null,
-        suggestedPaths,
-        suggestionType
+        suggestedPaths: [],
+        suggestionType: ZarrStoreSuggestionType.NO_OME
       }))
     }
-  }, [])
+  }, [processGroup])
 
   const navigateToSuggestion = useCallback(async (suggestionPath: string) => {
-    const currentUrl = state.source
-    const baseUrl = currentUrl.endsWith('/') ? currentUrl.slice(0, -1) : currentUrl
-    const newUrl = `${baseUrl}/${suggestionPath}`
+    if (!state.store) {
+      console.error('No store available for navigation')
+      return
+    }
+
+    console.log(`Navigating to suggestion: ${suggestionPath}`)
     
-    console.log(`Navigating from ${currentUrl} to ${newUrl}`)
-    setSource(newUrl)
-    await loadStore(newUrl)
-  }, [state.source, loadStore])
+    try {
+      // Navigate within the current store, not by changing the URL
+      const rootGroup = zarrita.root(state.store)
+      const targetGroup = await zarrita.open(rootGroup.resolve(suggestionPath))
+      
+      if (targetGroup instanceof zarrita.Group) {
+        setState(prev => ({ ...prev, root: targetGroup }))
+        await processGroup(targetGroup)
+      } else {
+        throw new Error("Suggested path does not point to a group")
+      }
+    } catch (error) {
+      console.error(`Error navigating to suggestion ${suggestionPath}:`, error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      setState(prev => ({
+        ...prev,
+        error: `Failed to navigate to ${suggestionPath}: ${errorMessage}`,
+        isLoading: false
+      }))
+    }
+  }, [state.store, processGroup])
+
+  // Auto-load Cellpose data when multiscale image is loaded
+  useEffect(() => {
+    refreshCellposeData()
+  }, [refreshCellposeData])
 
   const value: ZarrStoreContextType = {
     ...state,
     loadStore,
     setSource,
-    navigateToSuggestion
+    navigateToSuggestion,
+    refreshCellposeData
   }
 
   return (
