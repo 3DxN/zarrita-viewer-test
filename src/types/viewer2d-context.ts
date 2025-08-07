@@ -35,7 +35,6 @@ export interface Viewer2DDataContextType {
   setVivViewState: (state: VivViewState) => void
   
   // Data access
-  frameBoundArray: zarrita.Chunk<zarrita.DataType> | null
   frameBoundCellposeData: zarrita.Chunk<zarrita.DataType> | null
   isDataLoading: boolean
   dataError: string | null

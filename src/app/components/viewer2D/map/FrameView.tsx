@@ -201,8 +201,9 @@ export function calculateFrameResize(
   const [startCenterX, startCenterY] = startFrameCenter;
   const [startWidth, startHeight] = startFrameSize;
 
-  // Set the minimum frame size
+  // Set the minimum and maximum frame size
   const MIN_FRAME_SIZE = 30;
+  const MAX_FRAME_SIZE = 500;
 
   // Calculate the starting edges of the box
   let top = startCenterY - startHeight / 2;
@@ -226,43 +227,64 @@ export function calculateFrameResize(
       // Clamp if needed
       if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
       if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) left = right - MAX_FRAME_SIZE;
+      if (bottom - top > MAX_FRAME_SIZE) top = bottom - MAX_FRAME_SIZE;
       break;
     case "resize-ne":
       right += deltaX;
       top += deltaY;
       if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
       if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) right = left + MAX_FRAME_SIZE;
+      if (bottom - top > MAX_FRAME_SIZE) top = bottom - MAX_FRAME_SIZE;
       break;
     case "resize-sw":
       left += deltaX;
       bottom += deltaY;
       if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
       if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) left = right - MAX_FRAME_SIZE;
+      if (bottom - top > MAX_FRAME_SIZE) bottom = top + MAX_FRAME_SIZE;
       break;
     case "resize-se":
       right += deltaX;
       bottom += deltaY;
       if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
       if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) right = left + MAX_FRAME_SIZE;
+      if (bottom - top > MAX_FRAME_SIZE) bottom = top + MAX_FRAME_SIZE;
       break;
 
     // --- Edge Handles ---
     case "resize-n":
       top += deltaY;
       if (bottom - top < MIN_FRAME_SIZE) top = bottom - MIN_FRAME_SIZE;
+      // Clamp max size
+      if (bottom - top > MAX_FRAME_SIZE) top = bottom - MAX_FRAME_SIZE;
       break;
     case "resize-s":
       bottom += deltaY;
       if (bottom - top < MIN_FRAME_SIZE) bottom = top + MIN_FRAME_SIZE;
+      // Clamp max size
+      if (bottom - top > MAX_FRAME_SIZE) bottom = top + MAX_FRAME_SIZE;
       break;
     case "resize-w":
       left += deltaX;
       if (right - left < MIN_FRAME_SIZE) left = right - MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) left = right - MAX_FRAME_SIZE;
       break;
     case "resize-e":
       right += deltaX;
       if (right - left < MIN_FRAME_SIZE) right = left + MIN_FRAME_SIZE;
+      // Clamp max size
+      if (right - left > MAX_FRAME_SIZE) right = left + MAX_FRAME_SIZE;
       break;
+
   }
 
   // Recalculate the final size and center from the clamped edges

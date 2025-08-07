@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useViewer2DData } from '../../contexts/Viewer2DDataContext'
+import { useZarrStore } from '../../contexts/ZarrStoreContext'
 
 export default function Viewer3D() {
   const {
@@ -14,11 +15,12 @@ export default function Viewer3D() {
     currentTimeSlice,
     setZSlice,
     setTimeSlice,
-    frameBoundArray,
     frameBoundCellposeData,
     isDataLoading,
     dataError
   } = useViewer2DData()
+
+  const { msInfo } = useZarrStore();
 
   // Test functions for frame manipulation
   const moveFrameRandomly = () => {
@@ -141,50 +143,57 @@ export default function Viewer3D() {
       </div>
 
       {/* Z/T Slice Controls */}
-      <div style={{ 
-        marginBottom: '20px', 
-        padding: '15px', 
-        backgroundColor: 'white', 
-        borderRadius: '6px',
-        border: '1px solid #ddd'
-      }}>
-        <h3 style={{ marginTop: 0, color: '#007bff' }}>Slice Controls</h3>
-        
-        <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label><strong>Z:</strong></label>
-            <input 
-              type="number" 
-              value={currentZSlice} 
-              onChange={(e) => setZSlice(parseInt(e.target.value) || 0)}
-              min="0"
-              max="10"
-              style={{ 
-                width: '80px', 
-                padding: '4px 8px', 
-                border: '1px solid #ccc', 
-                borderRadius: '4px' 
-              }}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <label><strong>Time:</strong></label>
-            <input 
-              type="number" 
-              value={currentTimeSlice} 
-              onChange={(e) => setTimeSlice(parseInt(e.target.value) || 0)}
-              min="0"
-              max="10"
-              style={{ 
-                width: '80px', 
-                padding: '4px 8px', 
-                border: '1px solid #ccc', 
-                borderRadius: '4px' 
-              }}
-            />
+      {msInfo && (msInfo.shape.z || msInfo.shape.t) && (
+        <div style={{ 
+          marginBottom: '20px', 
+          padding: '15px', 
+          backgroundColor: 'white', 
+          borderRadius: '6px',
+          border: '1px solid #ddd'
+        }}>
+          <h3 style={{ marginTop: 0, color: '#007bff' }}>Slice Controls</h3>
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+
+            {msInfo.shape.z && msInfo.shape.z > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label><strong>Z:</strong></label>
+                <input 
+                  type="number" 
+                  value={currentZSlice} 
+                  onChange={(e) => setZSlice(parseInt(e.target.value) || 0)}
+                  min="0"
+                  max={msInfo?.shape.z ? msInfo.shape.z - 1 : 0}
+                  style={{ 
+                    width: '80px', 
+                    padding: '4px 8px', 
+                    border: '1px solid #ccc', 
+                    borderRadius: '4px' 
+                  }}
+                />
+              </div>
+            )}
+            {msInfo.shape.t && msInfo.shape.t > 1 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label><strong>T:</strong></label>
+                <input 
+                  type="number" 
+                  value={currentTimeSlice} 
+                  onChange={(e) => setTimeSlice(parseInt(e.target.value) || 0)}
+                  min="0"
+                  max={msInfo?.shape.t ? msInfo.shape.t - 1 : 0}
+                  style={{ 
+                    width: '80px', 
+                    padding: '4px 8px', 
+                    border: '1px solid #ccc', 
+                    borderRadius: '4px' 
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
-      </div>
+
+      )}
 
       {/* Auto-Updated Data Display */}
       <div style={{ 
@@ -210,27 +219,6 @@ export default function Viewer3D() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
           <div>
-            <h4 style={{ marginTop: 0, color: '#17a2b8' }}>Main Array Data</h4>
-            {frameBoundArray ? (
-              <div style={{ fontSize: '14px', fontFamily: 'monospace', backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '4px' }}>
-                <div><strong>Shape:</strong> {JSON.stringify(frameBoundArray.shape)}</div>
-                <div><strong>Data type:</strong> {frameBoundArray.data.constructor.name}</div>
-                <div><strong>Size:</strong> {frameBoundArray.data.length.toLocaleString()} elements</div>
-                {(() => {
-                  const dataArray = Array.from(frameBoundArray.data as ArrayLike<number>)
-                  return (
-                    <>
-                      <div>Hello</div>
-                    </>
-                  )
-                })()}
-              </div>
-            ) : (
-              <div style={{ color: '#6c757d' }}>No main data loaded yet</div>
-            )}
-          </div>
-
-          <div>
             <h4 style={{ marginTop: 0, color: '#28a745' }}>Cellpose Data</h4>
             {frameBoundCellposeData ? (
               <div style={{ fontSize: '14px', fontFamily: 'monospace', backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '4px' }}>
@@ -240,10 +228,15 @@ export default function Viewer3D() {
                 {(() => {
                   const dataArray = Array.from(frameBoundCellposeData.data as ArrayLike<number>)
                   const uniqueValues = new Set(dataArray)
+                  const cellMap = dataArray.reduce((acc, val) => {
+                    acc[val] = (acc[val] || 0) + 1
+                    return acc
+                  }, {} as Record<number, number>)
                   return (
-                    <>
+                    <div>
                       <div><strong>Unique values:</strong> {uniqueValues.size} labels</div>
-                    </>
+                      <div><strong>CellMap:</strong> {JSON.stringify(cellMap, null, 2)}</div>
+                    </div>
                   )
                 })()}
               </div>
