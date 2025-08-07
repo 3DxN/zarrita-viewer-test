@@ -35,8 +35,8 @@ export function useFrameInitialization(
       console.log('Initializing frame state and view state for the first time')
       
       setFrameCenter([width / 2, height / 2])
-      setFrameSize([Math.min(width, height) * 0.2, Math.min(width, height) * 0.2]) // 20% of smaller dimension
-      
+      setFrameSize([Math.min(500, Math.min(width, height) * 0.2), Math.min(500, Math.min(width, height) * 0.2)]) // 20% of smaller dimension
+
       // Only initialize detail view state if it hasn't been set yet
       if (!controlledDetailViewState) {
         // Initialize detail view state to show the lowest resolution (zoomed out)

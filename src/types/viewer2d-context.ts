@@ -9,8 +9,10 @@ export interface Viewer2DDataContextType {
   // Frame state (replaces FrameStateContext)
   frameCenter: [number, number]
   frameSize: [number, number]
+  frameZDepth: number
   setFrameCenter: (center: [number, number]) => void
   setFrameSize: (size: [number, number]) => void
+  setFrameZDepth: (depth: number) => void
   getFrameBounds: () => {
     left: number
     right: number

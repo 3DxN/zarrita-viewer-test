@@ -64,7 +64,7 @@ export default function CrossViewer() {
     // Set the full, initial navigation state, including default contrast limits for the first channel
     setNavigationState({
       ...initialNavState,
-      contrastLimits: [maxContrastLimit, maxContrastLimit] // Default contrast for the first channel
+      contrastLimits: [maxContrastLimit, 1024] // Default cytoplasm is on
     });
 
   }, [hasLoadedArray, msInfo, navigationState, setNavigationState]) // When the store is loaded, initialize with default values

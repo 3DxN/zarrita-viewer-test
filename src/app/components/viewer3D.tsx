@@ -8,8 +8,10 @@ export default function Viewer3D() {
   const {
     frameCenter,
     frameSize,
+    frameZDepth,
     setFrameCenter,
     setFrameSize,
+    setFrameZDepth,
     getFrameBounds,
     currentZSlice,
     currentTimeSlice,
@@ -17,7 +19,8 @@ export default function Viewer3D() {
     setTimeSlice,
     frameBoundCellposeData,
     isDataLoading,
-    dataError
+    dataError,
+    navigationState
   } = useViewer2DData()
 
   const { msInfo } = useZarrStore();
@@ -190,6 +193,25 @@ export default function Viewer3D() {
                 />
               </div>
             )}
+            {msInfo.shape.z && msInfo.shape.z > 1 && navigationState && navigationState.zSlice !== undefined && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <label><strong>Z Depth Amplitude:</strong></label>
+                <input 
+                  type="number" 
+                  value={frameZDepth} 
+                  onChange={(e) => setFrameZDepth(parseInt(e.target.value) || 0)}
+                  min="0"
+                  max={msInfo?.shape.t ? (msInfo.shape.t - 1)/2 : 0}
+                  style={{ 
+                    width: '80px', 
+                    padding: '4px 8px', 
+                    border: '1px solid #ccc', 
+                    borderRadius: '4px' 
+                  }}
+                />
+                <label>{`(${navigationState.zSlice - frameZDepth}-${navigationState.zSlice + frameZDepth + 1})`}</label>
+              </div>
+            )}
           </div>
         </div>
 
@@ -203,7 +225,7 @@ export default function Viewer3D() {
         borderRadius: '6px',
         border: '1px solid #ddd'
       }}>
-        <h3 style={{ marginTop: 0, color: '#007bff' }}>Auto-Updated Frame Data</h3>
+        <h3 style={{ marginTop: 0, color: '#007bff' }}>Frame-Bound Data</h3>
         
         {isDataLoading && (
           <div style={{ color: '#007bff', marginBottom: '10px' }}>
@@ -219,7 +241,7 @@ export default function Viewer3D() {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '15px' }}>
           <div>
-            <h4 style={{ marginTop: 0, color: '#28a745' }}>Cellpose Data</h4>
+            <h4 style={{ marginTop: 0, color: '#28a745' }}>Cellpose Data (For debugging, may cause lag)</h4>
             {frameBoundCellposeData ? (
               <div style={{ fontSize: '14px', fontFamily: 'monospace', backgroundColor: '#f8f9fa', padding: '10px', borderRadius: '4px' }}>
                 <div><strong>Shape:</strong> {JSON.stringify(frameBoundCellposeData.shape)}</div>

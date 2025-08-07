@@ -31,6 +31,7 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
   // Frame state (replacing FrameStateContext)
   const [frameCenter, setFrameCenter] = useState<[number, number]>([500, 500])
   const [frameSize, setFrameSize] = useState<[number, number]>([400, 400])
+  const [frameZDepth, setFrameZDepth] = useState<number>(5)
   
   // View state
   const [navigationState, setNavigationState] = useState<NavigationState | null>(null)
@@ -143,8 +144,10 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
       const selection: (number | zarrita.Slice | null)[] = []
       
       // Build selection array based on actual array shape
-      const hasZ = array.shape.length > 2 && msInfo?.shape.z && msInfo.shape.z > 1
-      selection.push(hasZ ? currentZSlice : 0) // Use current Z slice or 0 if not
+      const hasZ = array.shape.length > 2 && msInfo?.shape.z && msInfo.shape.z >= 1
+      if (hasZ) {
+        selection.push(zarrita.slice(currentZSlice - frameZDepth, currentZSlice + frameZDepth + 1))
+      }
       selection.push(zarrita.slice(y1, y2))
       selection.push(zarrita.slice(x1, x2))
       
@@ -197,8 +200,10 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
     // Frame state
     frameCenter,
     frameSize,
+    frameZDepth,
     setFrameCenter,
     setFrameSize,
+    setFrameZDepth,
     getFrameBounds,
     
     // View state
@@ -208,7 +213,7 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
     setViewBounds,
     setZSlice,
     setTimeSlice,
-    
+
     // Navigation state
     navigationState,
     setNavigationState,
