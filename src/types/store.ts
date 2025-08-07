@@ -1,4 +1,4 @@
-import type { FetchStore, Location } from "zarrita"
+import type { FetchStore, Location, Array as ZArray } from "zarrita"
 import type { ReactNode } from "react"
 
 import type OMEAttrs from "./ome"
@@ -34,19 +34,69 @@ export interface ZarrStoreSuggestedPath {
 }
 
 export interface ZarrStoreState {
+  /**
+   * The currently loaded Zarr store
+   */
   store: FetchStore | null
+  /**
+   * The relative path location of the Zarr store that is currently being viewed
+   */
   root: Location<FetchStore> | null
-  omeData: OMEAttrs | null // Single OME object containing all metadata (plate, well, multiscales, etc.)
-  msInfo: IMultiscaleInfo | null // Current array info
-  cellposeArray: any | null // Cellpose/segmentation array (loaded at store level)
+  /**
+   * Single OME object containing all metadata of that group
+   */
+  omeData: OMEAttrs | null
+  /**
+   * Information about the current multiscale group
+   */
+  msInfo: IMultiscaleInfo | null
+  /**
+   * Cellpose/segmentation array loaded at store level
+   */
+  cellposeArray: ZArray<FetchStore> | null
+  /**
+   * Whether the Cellpose array is currently being loaded
+   */
   isCellposeLoading: boolean
+  /**
+   * Error message if Cellpose loading fails
+   */
   cellposeError: string | null
+  /**
+   * Whether the viewing image data is being loaded
+   */
   isLoading: boolean
+  /**
+   * Error message if loading the store or paths within it fails
+   */
   error: string | null
-  infoMessage: string | null // For non-error informational messages (like well/plate selection)
+  /**
+   * For non-error informational messages (such as further navigation instructions)
+   */
+  infoMessage: string | null
+  /**
+   * Current source URL of the Zarr store
+   * This is used to reload the store or navigate to a different one
+   */
   source: string
-  hasLoadedArray: boolean // Track if user has successfully loaded a store
-  suggestedPaths: Array<{ path: string; isGroup: boolean; hasOme: boolean }> // Suggested navigation paths
+  /**
+   * Whether the user has successfully loaded a multiscales image array
+   * And to initialise the display of the viewer if so.
+   */
+  hasLoadedArray: boolean
+  /**
+   * Suggested paths for navigation based on the current store
+   * If the current group is not an multiscales group or image
+   */
+  suggestedPaths: Array<{
+    path: string;
+    isGroup: boolean;
+    hasOme: boolean
+  }>
+  /**
+   * Type of suggestions being offered based on the current store
+   * This helps in determining how to present the suggestions to the user
+   */
   suggestionType: ZarrStoreSuggestionType // Type of suggestions being offered
 }
 

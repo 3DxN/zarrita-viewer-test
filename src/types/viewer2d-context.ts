@@ -2,6 +2,7 @@
  * Viewer2D data context types for unified 2D viewer state management
  */
 
+import * as zarrita from 'zarrita'
 import type { NavigationState, VivViewState } from './viewer2D'
 
 export interface Viewer2DDataContextType {
@@ -34,8 +35,8 @@ export interface Viewer2DDataContextType {
   setVivViewState: (state: VivViewState) => void
   
   // Data access
-  getFrameBoundArray: () => Promise<any | null>
-  getFrameBoundCellposeData: () => Promise<any | null>
+  frameBoundArray: zarrita.Chunk<zarrita.DataType> | null
+  frameBoundCellposeData: zarrita.Chunk<zarrita.DataType> | null
   isDataLoading: boolean
   dataError: string | null
 }

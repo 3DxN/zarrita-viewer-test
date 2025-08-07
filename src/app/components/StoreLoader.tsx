@@ -96,7 +96,7 @@ export default function StoreLoader() {
                   key={index}
                   onClick={() => navigateToSuggestion(suggestion.path)}
                   style={{
-                    padding: '4px 8px',
+                    padding: '4px 10px',
                     backgroundColor: suggestion.hasOme ? '#28a745' : suggestion.isGroup ? '#17a2b8' : '#6c757d',
                     color: 'white',
                     border: 'none',

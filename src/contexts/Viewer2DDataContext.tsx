@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react'
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
 import * as zarrita from 'zarrita'
 
 import { useZarrStore } from './ZarrStoreContext'
@@ -40,6 +40,8 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
   // Data loading state
   const [isDataLoading, setIsDataLoading] = useState(false)
   const [dataError, setDataError] = useState<string | null>(null)
+  const [frameBoundArray, setFrameBoundArray] = useState<zarrita.Chunk<zarrita.DataType> | null>(null)
+  const [frameBoundCellposeData, setFrameBoundCellposeData] = useState<zarrita.Chunk<zarrita.DataType> | null>(null)
   
   // Frame bounds calculation
   const getFrameBounds = useCallback(() => {
@@ -117,113 +119,51 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
   const currentZSlice = navigationState?.zSlice ?? 0
   const currentTimeSlice = navigationState?.timeSlice ?? 0
   
-  // Get frame-bound main array data
-  const getFrameBoundArray = useCallback(async (): Promise<any | null> => {
-    if (!root || !msInfo || !navigationState) {
-      console.log('❌ Missing requirements for frame-bound array')
+  // Helper function for frame-bound array slicing (DRY principle)
+  const getFrameBoundData = useCallback(async (
+    array: zarrita.Array<zarrita.DataType>,
+    isCellpose: boolean
+  ): Promise<zarrita.Chunk<zarrita.DataType> | null> => {
+    if (!navigationState) {
+      console.log('❌ Missing navigation state for frame-bound data')
       return null
     }
     
-    setIsDataLoading(true)
-    setDataError(null)
-    
     try {
-      // Get highest resolution array (first in resolutions list)
-      const highestResPath = msInfo.resolutions[0]
-      const fullArray = await zarrita.open(root.resolve(highestResPath)) as zarrita.Array<zarrita.DataType>
-      
       // Calculate frame bounds
       const bounds = getFrameBounds()
-      
-      // Create slice selection for frame bounds + current Z/T
-      const selection: any = {}
-      
-      // Add Z/T dimensions if they exist
-      if (msInfo.shape.t && msInfo.shape.t > 1) {
-        selection.t = currentTimeSlice
-      }
-      if (msInfo.shape.z && msInfo.shape.z > 1) {
-        selection.z = currentZSlice
-      }
       
       // Add spatial bounds (ensure they're within array bounds)
-      const maxX = msInfo.shape.x || fullArray.shape[fullArray.shape.length - 1]
-      const maxY = msInfo.shape.y || fullArray.shape[fullArray.shape.length - 2]
+      const maxX = array.shape[array.shape.length - 1]
+      const maxY = array.shape[array.shape.length - 2]
       
       const x1 = Math.max(0, Math.floor(bounds.left))
       const x2 = Math.min(maxX, Math.ceil(bounds.right))
       const y1 = Math.max(0, Math.floor(bounds.top))
       const y2 = Math.min(maxY, Math.ceil(bounds.bottom))
       
-      selection.x = zarrita.slice(x1, x2)
-      selection.y = zarrita.slice(y1, y2)
+      // Create array-based selection based on array dimensions
+      const selection: (number | zarrita.Slice | null)[] = []
       
-      // Apply selection to get frame-bound data
-      const result = await zarrita.get(fullArray, selection)
-      
-      console.log('✅ Frame-bound array extracted:', {
-        originalShape: fullArray.shape,
-        bounds: { x1, y1, x2, y2 },
-        selection,
-        resultShape: result.shape
-      })
-      
-      return result
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-      console.error('❌ Error getting frame-bound array:', errorMsg)
-      setDataError(errorMsg)
-      return null
-    } finally {
-      setIsDataLoading(false)
-    }
-  }, [root, msInfo, navigationState, getFrameBounds, currentZSlice, currentTimeSlice])
-  
-  // Get frame-bound Cellpose data
-  const getFrameBoundCellposeData = useCallback(async (): Promise<any | null> => {
-    if (!cellposeArray || !navigationState) {
-      console.log('❌ No Cellpose array available or missing navigation state')
-      return null
-    }
-    
-    setIsDataLoading(true)
-    setDataError(null)
-    
-    try {
-      // Calculate frame bounds
-      const bounds = getFrameBounds()
-      
-      // Create slice selection for frame bounds + current Z/T
-      const selection: any = {}
-      
-      // Add Z/T dimensions if they exist in Cellpose data
-      if (cellposeArray.shape.length > 2) {
-        // Assume Cellpose data has same dimensional structure as main data
-        if (msInfo?.shape.t && msInfo.shape.t > 1) {
-          selection.t = currentTimeSlice
+      // Build selection array based on actual array shape
+      // Non-cellpose arrays might have more dimensions
+      if (!isCellpose) {
+        if (msInfo?.shape.t && msInfo.shape.t >= 1) {
+          selection.push(currentTimeSlice) // Use current time slice if available
         }
-        if (msInfo?.shape.z && msInfo.shape.z > 1) {
-          selection.z = currentZSlice
+        if (msInfo?.shape.c && msInfo.shape.c >= 1) {
+          selection.push(null) // Allow all channels, by default (might need filtering by channelMap)
         }
       }
+      const hasZ = array.shape.length > 2 && msInfo?.shape.z && msInfo.shape.z > 1
+      selection.push(hasZ ? currentZSlice : 0) // Use current Z slice or 0 if not
+      selection.push(zarrita.slice(y1, y2))
+      selection.push(zarrita.slice(x1, x2))
       
-      // Add spatial bounds (ensure they're within Cellpose array bounds)
-      const maxX = cellposeArray.shape[cellposeArray.shape.length - 1]
-      const maxY = cellposeArray.shape[cellposeArray.shape.length - 2]
-      
-      const x1 = Math.max(0, Math.floor(bounds.left))
-      const x2 = Math.min(maxX, Math.ceil(bounds.right))
-      const y1 = Math.max(0, Math.floor(bounds.top))
-      const y2 = Math.min(maxY, Math.ceil(bounds.bottom))
-      
-      selection.x = zarrita.slice(x1, x2)
-      selection.y = zarrita.slice(y1, y2)
-      
-      // Apply selection to get frame-bound Cellpose data
-      const result = await zarrita.get(cellposeArray, selection)
-      
-      console.log('✅ Frame-bound Cellpose data extracted:', {
-        originalShape: cellposeArray.shape,
+      const result = await zarrita.get(array, selection)
+
+      console.log(`✅ Frame-bound ${isCellpose ? 'cellpose' : 'main'} data extracted:`, {
+        originalShape: array.shape,
         bounds: { x1, y1, x2, y2 },
         selection,
         resultShape: result.shape
@@ -232,13 +172,69 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
       return result
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
-      console.error('❌ Error getting frame-bound Cellpose data:', errorMsg)
-      setDataError(errorMsg)
-      return null
-    } finally {
-      setIsDataLoading(false)
+      console.error(`❌ Error getting frame-bound ${isCellpose ? 'cellpose' : 'main'} data:`, errorMsg)
+      throw error
     }
-  }, [cellposeArray, navigationState, getFrameBounds, currentZSlice, currentTimeSlice, msInfo])
+  }, [navigationState, getFrameBounds, currentZSlice, currentTimeSlice, msInfo])
+  
+  // Auto-update frame-bound array data when dependencies change
+  useEffect(() => {
+    const loadFrameBoundArray = async () => {
+      if (!root || !msInfo || !navigationState) {
+        setFrameBoundArray(null)
+        return
+      }
+      
+      setIsDataLoading(true)
+      setDataError(null)
+      
+      try {
+        // Get highest resolution array (first in resolutions list)
+        const highestResPath = msInfo.resolutions[0]
+        const fullArray = await zarrita.open(root.resolve(highestResPath)) as zarrita.Array<zarrita.DataType>
+        // Use shared helper function
+        const result = await getFrameBoundData(fullArray, false)
+        setFrameBoundArray(result)
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+        console.error('❌ Error getting frame-bound array:', errorMsg)
+        setDataError(errorMsg)
+        setFrameBoundArray(null)
+      } finally {
+        setIsDataLoading(false)
+      }
+    }
+    
+    loadFrameBoundArray()
+  }, [root, msInfo, navigationState, frameCenter, frameSize, currentZSlice, currentTimeSlice])
+  
+  // Auto-update frame-bound Cellpose data when dependencies change
+  useEffect(() => {
+    const loadFrameBoundCellposeData = async () => {
+      if (!cellposeArray || !navigationState) {
+        setFrameBoundCellposeData(null)
+        return
+      }
+      
+      setIsDataLoading(true)
+      setDataError(null)
+      
+      try {
+        // Use shared helper function
+        const result = await getFrameBoundData(cellposeArray, true)
+        setFrameBoundCellposeData(result)
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+        console.error('❌ Error getting frame-bound Cellpose data:', errorMsg)
+        setDataError(errorMsg)
+        setFrameBoundCellposeData(null)
+      } finally {
+        setIsDataLoading(false)
+      }
+    }
+    
+    loadFrameBoundCellposeData()
+  }, [cellposeArray, navigationState, frameCenter, frameSize, currentZSlice, currentTimeSlice])
   
   const contextValue: Viewer2DDataContextType = {
     // Frame state
@@ -265,8 +261,8 @@ export function Viewer2DDataProvider({ children }: Viewer2DDataProviderProps) {
     setVivViewState,
     
     // Data access
-    getFrameBoundArray,
-    getFrameBoundCellposeData,
+    frameBoundArray,
+    frameBoundCellposeData,
     isDataLoading: isDataLoading || isCellposeLoading,
     dataError: dataError || cellposeError
   }

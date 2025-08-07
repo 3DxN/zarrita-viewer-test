@@ -6,42 +6,43 @@ import NavigationControls from './nav/navigator'
 import VivViewerWrapper from './map/VivViewerWrapper'
 import { getDefaultMaxContrastLimit, getInitialNavigationState } from '../../../utils/getDefaults'
 import { useZarrStore } from '../../../contexts/ZarrStoreContext'
+import { useViewer2DData } from '../../../contexts/Viewer2DDataContext'
 
 import type { 
-  NavigationState, NavigationLimits, 
+  NavigationLimits, 
   NavigationHandlers,ChannelMapping, ContrastLimits
 } from '../../../types/viewer2D'
 
 
 export default function CrossViewer() {
-  const { hasLoadedArray: hasLoadedStore, msInfo } = useZarrStore()
+  const { hasLoadedArray, msInfo } = useZarrStore()
+  const { navigationState, setNavigationState } = useViewer2DData()
   
-  // Navigation state, limits and handlers
-  const [navigationState, setNavigationState] = useState<NavigationState | null>(null)
+  // Navigation limits and handlers (state managed by context)
   const [navigationLimits, setNavigationLimits] = useState<NavigationLimits | null>(null)
   const navigationHandlers: NavigationHandlers = {
-    onXOffsetChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, xOffset: value }) : prev),
-    onYOffsetChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, yOffset: value }) : prev),
-    onZSliceChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, zSlice: value }) : prev),
-    onTimeSliceChange: (value: number) => setNavigationState(prev => prev ? ({ ...prev, timeSlice: value }) : prev),
-    onContrastLimitsChange: (limits: ContrastLimits) => setNavigationState(
-      prev => prev ? ({ ...prev, contrastLimits: limits }) : prev
-    ),
-    onChannelChange: (role: keyof ChannelMapping, value: number | null) => setNavigationState(prev => prev ? ({
-      ...prev,
+    onXOffsetChange: (value: number) => navigationState && setNavigationState({ ...navigationState, xOffset: value }),
+    onYOffsetChange: (value: number) => navigationState && setNavigationState({ ...navigationState, yOffset: value }),
+    onZSliceChange: (value: number) => navigationState && setNavigationState({ ...navigationState, zSlice: value }),
+    onTimeSliceChange: (value: number) => navigationState && setNavigationState({ ...navigationState, timeSlice: value }),
+    onContrastLimitsChange: (limits: ContrastLimits) => navigationState && setNavigationState({
+      ...navigationState, contrastLimits: limits
+    }),
+    onChannelChange: (role: keyof ChannelMapping, value: number | null) => navigationState && setNavigationState({
+      ...navigationState,
       channelMap: {
-        ...prev.channelMap,
+        ...navigationState.channelMap,
         [role]: value
       }
-    }) : prev)
+    })
   }
 
   /**
    * When the store is loaded from ZarrStoreContext, we now initialise the viewer with defaults
    */
   useEffect(() => {
-    if (!msInfo) {
-      return; // Guard against missing multiscale information
+    if (!msInfo || navigationState) {
+      return; // Guard against missing multiscale information or already initialized
     }
 
     // Get the default navigation state (z-slice, channel map, etc.)
@@ -66,7 +67,7 @@ export default function CrossViewer() {
       contrastLimits: [maxContrastLimit, maxContrastLimit] // Default contrast for the first channel
     });
 
-  }, [hasLoadedStore]) // When the store is loaded, initialize with default values
+  }, [hasLoadedArray, msInfo, navigationState, setNavigationState]) // When the store is loaded, initialize with default values
 
   return (
     <div style={{ 
@@ -76,7 +77,7 @@ export default function CrossViewer() {
       flexDirection: 'column'
     }}>
 
-      {hasLoadedStore && msInfo && navigationState && navigationLimits ? (
+      {hasLoadedArray && msInfo && navigationState && navigationLimits ? (
         <div style={{ 
           display: 'flex', 
           gap: '20px', 
